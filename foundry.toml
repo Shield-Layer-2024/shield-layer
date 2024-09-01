@@ -7,7 +7,7 @@
     optimizer_runs = 20000
     out            = "out"
     src            = "contracts"
-    test           = 'test/foundry'
+    test           = 'test'
 
 [fmt]
     tab_width = 2
