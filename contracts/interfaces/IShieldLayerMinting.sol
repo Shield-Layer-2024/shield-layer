@@ -38,6 +38,7 @@ interface IShieldLayerMinting is IShieldLayerMintingEvents {
   error InvalidslUSDAddress();
   error InvalidZeroAddress();
   error InvalidAssetAddress();
+  error InvalidAssetRatio();
   error InvalidCustodianAddress();
   error InvalidOrder();
   error InvalidAffirmedAmount();

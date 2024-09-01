@@ -53,12 +53,10 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
   IslUSD public slusd;
 
   /// @notice Supported assets
-  EnumerableSet.AddressSet internal _supportedAssets;
-
-  mapping(address => uint256) private _assetRatios;
+  mapping(address => uint256) internal _supportedAssets;
 
   // @notice custodian addresses
-  address internal _custodianAddress;
+  address public custodianAddress;
 
   /// @notice holds computable chain id
   uint256 private immutable _chainId;
@@ -100,24 +98,9 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
 
   /* --------------- CONSTRUCTOR --------------- */
 
-  constructor(
-    IslUSD _slusd,
-    address[] memory _assets,
-    address _custodian,
-    address _admin,
-    uint256 _maxMintPerBlock,
-    uint256 _maxRedeemPerBlock
-  ) {
+  constructor(IslUSD _slusd, uint256 _maxMintPerBlock, uint256 _maxRedeemPerBlock) {
     if (address(_slusd) == address(0)) revert InvalidslUSDAddress();
-    if (_assets.length == 0) revert NoAssetsProvided();
-    if (_admin == address(0)) revert InvalidZeroAddress();
     slusd = _slusd;
-
-    for (uint256 i = 0; i < _assets.length; i++) {
-      addSupportedAsset(_assets[i]);
-    }
-
-    setCustodianAddress(_custodian);
 
     // Set the max mint/redeem limits per block
     _setMaxMintPerBlock(_maxMintPerBlock);
@@ -151,14 +134,14 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
 
     uint256 assetRatio = getAssetRatio(order.collateralAsset);
 
-    slusd.mint(order.beneficiary, order.collateralAmount / 100 * assetRatio);
+    slusd.mint(order.beneficiary, order.collateralAmount / 10000 * assetRatio);
     emit Mint(
       msg.sender,
       order.benefactor,
       order.beneficiary,
       order.collateralAsset,
       order.collateralAmount,
-      order.collateralAmount / 100 * assetRatio
+      order.collateralAmount / 10000 * assetRatio
     );
   }
 
@@ -183,15 +166,6 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
     );
   }
 
-  /**
-   * @notice Get Asset swap ratio
-   * @param asset struct containing order details and confirmation from server
-   */
-  function getAssetRatio(address asset) public view returns (uint256) {
-    uint256 ratio = _assetRatios[asset];
-    return ratio > 0 ? ratio : (_supportedAssets.contains(asset) ? 100 : 0);
-  }
-
   /// @notice Sets the max mintPerBlock limit
   function setMaxMintPerBlock(uint256 _maxMintPerBlock) external onlyOwner {
     _setMaxMintPerBlock(_maxMintPerBlock);
@@ -208,32 +182,45 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
     _setMaxRedeemPerBlock(0);
   }
 
-  /// @notice Removes an asset from the supported assets list
-  function removeSupportedAsset(address asset) external onlyOwner {
-    if (!_supportedAssets.remove(asset)) revert InvalidAssetAddress();
-    emit AssetRemoved(asset);
-  }
-
-  /// @notice Checks if an asset is supported.
-  function isSupportedAsset(address asset) external view returns (bool) {
-    return _supportedAssets.contains(asset);
-  }
-
   /* --------------- PUBLIC --------------- */
 
+  /// @notice Checks if an asset is supported.
+  function isSupportedAsset(address asset) public view returns (bool) {
+    return _supportedAssets[asset] > 0;
+  }
+
+  /// @notice Get asset swap ratio
+  function getAssetRatio(address asset) public view returns (uint256) {
+    if (_supportedAssets[asset] == 0) revert UnsupportedAsset();
+
+    return _supportedAssets[asset];
+  }
+
   /// @notice Adds an asset to the supported assets list.
-  function addSupportedAsset(address asset) public onlyOwner {
-    if (asset == address(0) || asset == address(slusd) || !_supportedAssets.add(asset)) {
-      revert InvalidAssetAddress();
-    }
+  function addSupportedAsset(address asset, uint256 ratio) public onlyOwner {
+    if (asset == address(0) || asset == address(slusd) || !(_supportedAssets[asset] == 0)) revert InvalidAssetAddress();
+    if (ratio == 0) revert InvalidAssetRatio();
+
+    _supportedAssets[asset] = ratio;
+
     emit AssetAdded(asset);
+  }
+
+  /// @notice Removes an asset from the supported assets list
+  function removeSupportedAsset(address asset) public onlyOwner {
+    if (_supportedAssets[asset] == 0) revert InvalidAssetAddress();
+
+    _supportedAssets[asset] = 0;
+
+    emit AssetRemoved(asset);
   }
 
   /// @notice Adds an custodian to the supported custodians list.
   function setCustodianAddress(address custodian) public onlyOwner {
-    if (custodian == address(0) || custodian == address(slusd) || custodian == _custodianAddress) {
+    if (custodian == address(0) || custodian == address(slusd) || custodian == custodianAddress) {
       revert InvalidCustodianAddress();
     }
+    custodianAddress = custodian;
     emit CustodianAddressSet(custodian);
   }
 
@@ -275,19 +262,21 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
       (bool success,) = (beneficiary).call{value: amount}("");
       if (!success) revert TransferFailed();
     } else {
-      if (!_supportedAssets.contains(asset)) revert UnsupportedAsset();
+      if (_supportedAssets[asset] == 0) revert UnsupportedAsset();
       IERC20(asset).safeTransfer(beneficiary, amount);
     }
   }
 
   /// @notice transfer supported asset to array of custody addresses per defined ratio
   function _transferCollateralToCustodian(uint256 amount, address asset, address beneficiary) internal {
+    // cannot mint before custodian is not set
+    if (custodianAddress == address(0)) revert InvalidCustodianAddress();
     // cannot mint using unsupported asset or native ETH even if it is supported for redemptions
-    if (!_supportedAssets.contains(asset) || asset == NATIVE_TOKEN) revert UnsupportedAsset();
+    if (_supportedAssets[asset] == 0 || asset == NATIVE_TOKEN) revert UnsupportedAsset();
 
     IERC20 token = IERC20(asset);
 
-    token.safeTransferFrom(beneficiary, _custodianAddress, amount);
+    token.safeTransferFrom(beneficiary, custodianAddress, amount);
   }
 
   /// @notice Sets the max mintPerBlock limit
