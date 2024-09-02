@@ -72,9 +72,6 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
   /// @notice slUSD redeemed per block
   mapping(uint256 => uint256) public redeemedPerBlock;
 
-  /// @notice For smart contracts to delegate signing to EOA address
-  mapping(address => mapping(address => bool)) public delegatedSigner;
-
   /// @notice max minted slUSD allowed per block
   uint256 public maxMintPerBlock;
   /// @notice max redeemed slUSD allowed per block
