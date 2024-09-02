@@ -17,6 +17,7 @@ contract slUSD is Ownable2Step, ERC20Burnable, ERC20Permit, IslUSDDefinitions {
 
   constructor(address admin) ERC20("slUSD", "slUSD") ERC20Permit("slUSD") {
     if (admin == address(0)) revert ZeroAddressException();
+
     _transferOwnership(admin);
   }
 
@@ -42,5 +43,9 @@ contract slUSD is Ownable2Step, ERC20Burnable, ERC20Permit, IslUSDDefinitions {
 
   function renounceOwnership() public view override onlyOwner {
     revert CantRenounceOwnership();
+  }
+
+  function decimals() public pure override returns (uint8) {
+    return 6;
   }
 }

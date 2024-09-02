@@ -12,4 +12,6 @@ forge verify-contract \
     --chain-id 11155111 \
     --etherscan-api-key GS477KS4QNQTUUEHZSWP1UIBFAYDHWU9GV \
     --compiler-version "0.8.19+commit.7dd6d404" \
-    --constructor-args $(cast abi-encode "constructor(address)" "0x04c17Bc9C98c9cdEddfEe8204a0153Fe65997DB7") "0x1481165718D57D8Caed98ad773665F394b456962" "slUSD"
+    --constructor-args \
+    $(cast abi-encode "constructor(address)" "0x04c17Bc9C98c9cdEddfEe8204a0153Fe65997DB7") \
+    "0xef9Be0440b3A8Fc4ea3dDbe8625D99048E48F322" "slUSD"

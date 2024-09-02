@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "./interfaces/IslUSD.sol";
 import "./interfaces/IShieldLayerMinting.sol";
@@ -19,21 +18,12 @@ import "./interfaces/IShieldLayerMinting.sol";
  */
 contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuard {
   using SafeERC20 for IERC20;
-  using EnumerableSet for EnumerableSet.AddressSet;
 
   /* --------------- CONSTANTS --------------- */
 
   /// @notice EIP712 domain
   bytes32 private constant EIP712_DOMAIN =
     keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-
-  /// @notice route type
-  bytes32 private constant ROUTE_TYPE = keccak256("Route(address[] addresses,uint256[] ratios)");
-
-  /// @notice order type
-  bytes32 private constant orderType = keccak256(
-    "Order(uint8 orderType,uint256 expiry,uint256 nonce,address benefactor,address beneficiary,address collateralAsset,uint256 collateralAmount)"
-  );
 
   /// @notice EIP712 domain hash
   bytes32 private constant EIP712_DOMAIN_TYPEHASH = keccak256(abi.encodePacked(EIP712_DOMAIN));
@@ -118,49 +108,30 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
     emit Received(msg.sender, msg.value);
   }
 
-  /**
-   * @notice Mint stablecoins from assets
-   * @param order struct containing order details and confirmation from server
-   */
-  function mint(Order calldata order) external override nonReentrant belowMaxMintPerBlock(order.collateralAmount) {
-    if (order.orderType != OrderType.MINT) revert InvalidOrder();
-
+  /// @notice Mint stablecoins from assets
+  function mint(address asset, uint256 amount) external override nonReentrant belowMaxMintPerBlock(amount) {
     // Add to the minted amount in this block
-    mintedPerBlock[block.number] += order.collateralAmount;
-    _transferCollateralToCustodian(order.collateralAmount, order.collateralAsset, order.beneficiary);
+    mintedPerBlock[block.number] += amount;
+    _transferCollateralToCustodian(amount, asset, msg.sender);
 
-    uint256 assetRatio = getAssetRatio(order.collateralAsset);
+    uint256 assetRatio = getAssetRatio(asset);
+    uint256 slusdAmount = amount * assetRatio / 10000;
 
-    slusd.mint(order.beneficiary, order.collateralAmount / 10000 * assetRatio);
-    emit Mint(
-      msg.sender,
-      order.benefactor,
-      order.beneficiary,
-      order.collateralAsset,
-      order.collateralAmount,
-      order.collateralAmount / 10000 * assetRatio
-    );
+    slusd.mint(msg.sender, slusdAmount);
+    emit Mint(msg.sender, asset, amount, slusdAmount);
   }
 
-  /**
-   * @notice Redeem stablecoins for assets
-   * @param order struct containing order details and confirmation from server
-   */
-  function redeem(Order calldata order) external override nonReentrant belowMaxRedeemPerBlock(order.collateralAmount) {
-    if (order.orderType != OrderType.REDEEM) revert InvalidOrder();
-
+  /// @notice Redeem stablecoins for assets
+  function redeem(address asset, uint256 amount) external override nonReentrant belowMaxRedeemPerBlock(amount) {
     // Add to the redeemed amount in this block
-    redeemedPerBlock[block.number] += order.collateralAmount;
-    slusd.burnFrom(order.benefactor, order.collateralAmount);
-    _transferToBeneficiary(order.beneficiary, order.collateralAsset, order.collateralAmount);
-    emit Redeem(
-      msg.sender,
-      order.benefactor,
-      order.beneficiary,
-      order.collateralAsset,
-      order.collateralAmount,
-      order.collateralAmount
-    );
+    redeemedPerBlock[block.number] += amount;
+    slusd.burnFrom(msg.sender, amount);
+
+    uint256 assetRatio = getAssetRatio(asset);
+    uint256 assetAmount = amount * 10000 / assetRatio;
+
+    _transferToBeneficiary(msg.sender, asset, assetAmount);
+    emit Redeem(msg.sender, asset, assetAmount, amount);
   }
 
   /// @notice Sets the max mintPerBlock limit
@@ -231,23 +202,6 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
     return _computeDomainSeparator();
   }
 
-  /// @notice hash an Order struct
-  function hashOrder(Order calldata order) public view override returns (bytes32) {
-    return ECDSA.toTypedDataHash(getDomainSeparator(), keccak256(encodeOrder(order)));
-  }
-
-  function encodeOrder(Order calldata order) public pure returns (bytes memory) {
-    return abi.encode(
-      orderType,
-      order.orderType,
-      order.expiry,
-      order.nonce,
-      order.benefactor,
-      order.collateralAsset,
-      order.collateralAmount
-    );
-  }
-
   /* --------------- PRIVATE --------------- */
 
   /* --------------- INTERNAL --------------- */
@@ -265,7 +219,7 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
   }
 
   /// @notice transfer supported asset to array of custody addresses per defined ratio
-  function _transferCollateralToCustodian(uint256 amount, address asset, address beneficiary) internal {
+  function _transferCollateralToCustodian(uint256 amount, address asset, address from) internal {
     // cannot mint before custodian is not set
     if (custodianAddress == address(0)) revert InvalidCustodianAddress();
     // cannot mint using unsupported asset or native ETH even if it is supported for redemptions
@@ -273,7 +227,7 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
 
     IERC20 token = IERC20(asset);
 
-    token.safeTransferFrom(beneficiary, custodianAddress, amount);
+    token.safeTransferFrom(from, custodianAddress, amount);
   }
 
   /// @notice Sets the max mintPerBlock limit

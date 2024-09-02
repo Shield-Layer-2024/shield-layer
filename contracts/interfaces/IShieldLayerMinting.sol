@@ -9,28 +9,9 @@ interface IShieldLayerMinting is IShieldLayerMintingEvents {
     Redeemer
   }
 
-  enum OrderType {
-    MINT,
-    REDEEM
-  }
-
-  enum SignatureType {
-    EIP712
-  }
-
-  struct Signature {
-    SignatureType signatureType;
-    bytes signatureBytes;
-  }
-
   struct Order {
-    OrderType orderType;
-    uint256 expiry;
-    uint256 nonce;
-    address benefactor;
-    address beneficiary;
-    address collateralAsset;
-    uint256 collateralAmount;
+    address asset;
+    uint256 amount;
   }
 
   error Duplicate();
@@ -53,9 +34,7 @@ interface IShieldLayerMinting is IShieldLayerMintingEvents {
   error MaxMintPerBlockExceeded();
   error MaxRedeemPerBlockExceeded();
 
-  function hashOrder(Order calldata order) external view returns (bytes32);
+  function mint(address asset, uint256 amount) external;
 
-  function mint(Order calldata order) external;
-
-  function redeem(Order calldata order) external;
+  function redeem(address asset, uint256 amount) external;
 }

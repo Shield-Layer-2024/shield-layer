@@ -6,24 +6,10 @@ interface IShieldLayerMintingEvents {
   event Received(address, uint256);
 
   /// @notice Event emitted when slUSD is minted
-  event Mint(
-    address minter,
-    address benefactor,
-    address beneficiary,
-    address indexed collateralAsset,
-    uint256 indexed collateralAmount,
-    uint256 indexed slusdAmount
-  );
+  event Mint(address minter, address indexed asset, uint256 indexed amount, uint256 indexed slusdAmount);
 
   /// @notice Event emitted when funds are redeemed
-  event Redeem(
-    address redeemer,
-    address benefactor,
-    address beneficiary,
-    address indexed collateralAsset,
-    uint256 indexed collateralAmount,
-    uint256 indexed slusdAmount
-  );
+  event Redeem(address redeemer, address indexed asset, uint256 indexed amount, uint256 indexed slusdAmount);
 
   /// @notice Event emitted when custody wallet is added
   event CustodyWalletAdded(address wallet);
