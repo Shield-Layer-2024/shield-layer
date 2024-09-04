@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-interface IShieldLayerMintingEvents {
+interface IShieldLayerEvents {
   /// @notice Event emitted when contract receives ETH
   event Received(address, uint256);
 
   /// @notice Event emitted when slUSD is minted
   event Mint(address minter, address indexed asset, uint256 indexed amount, uint256 indexed slusdAmount);
 
-  /// @notice Event emitted when funds are redeemed
-  event Redeem(address redeemer, address indexed asset, uint256 indexed amount, uint256 indexed slusdAmount);
+  /// @notice Event emitted when funds are burned
+  event Burn(address redeemer, address indexed asset, uint256 indexed amount, uint256 indexed slusdAmount);
 
   /// @notice Event emitted when custody wallet is added
   event CustodyWalletAdded(address wallet);
@@ -39,7 +39,7 @@ interface IShieldLayerMintingEvents {
   event MaxMintPerBlockChanged(uint256 indexed oldMaxMintPerBlock, uint256 indexed newMaxMintPerBlock);
 
   /// @notice Event emitted when the max redeem per block is changed
-  event MaxRedeemPerBlockChanged(uint256 indexed oldMaxRedeemPerBlock, uint256 indexed newMaxRedeemPerBlock);
+  event MaxBurnPerBlockChanged(uint256 indexed oldMaxBurnPerBlock, uint256 indexed newMaxBurnPerBlock);
 
   /// @notice Event emitted when a delegated signer is added, enabling it to sign orders on behalf of another address
   event DelegatedSignerAdded(address indexed signer, address indexed delegator);

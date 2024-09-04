@@ -4,19 +4,21 @@ pragma solidity 0.8.19;
 /**
  * solhint-disable private-vars-leading-underscore
  */
-import "@openzeppelin/contracts/access/Ownable2Step.sol";
+import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import "./interfaces/IslUSD.sol";
-import "./interfaces/IShieldLayerMinting.sol";
+import "./interfaces/IUSDsCooldown.sol";
+import "./interfaces/IShieldLayer.sol";
+import "./SingleAdminAccessControl.sol";
 
 /**
- * @title ShieldLayer Minting
+ * @title ShieldLayer
  * @notice This contract mints and redeems slUSD in a single, atomic, trustless transaction
  */
-contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuard {
+contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard {
   using SafeERC20 for IERC20;
 
   /* --------------- CONSTANTS --------------- */
@@ -41,6 +43,7 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
 
   /// @notice slusd stablecoin
   IslUSD public slusd;
+  IUSDsCooldown public usds;
 
   /// @notice Supported assets
   mapping(address => uint256) internal _supportedAssets;
@@ -54,18 +57,14 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
   /// @notice holds computable domain separator
   bytes32 private immutable _domainSeparator;
 
-  /// @notice user deduplication
-  mapping(address => mapping(uint256 => uint256)) private _orderBitmaps;
-
   /// @notice slUSD minted per block
   mapping(uint256 => uint256) public mintedPerBlock;
-  /// @notice slUSD redeemed per block
-  mapping(uint256 => uint256) public redeemedPerBlock;
-
   /// @notice max minted slUSD allowed per block
   uint256 public maxMintPerBlock;
-  /// @notice max redeemed slUSD allowed per block
-  uint256 public maxRedeemPerBlock;
+  /// @notice slUSD burned per block
+  mapping(uint256 => uint256) public burnedPerBlock;
+  /// @notice max burned slUSD allowed per block
+  uint256 public maxBurnPerBlock;
 
   /* --------------- MODIFIERS --------------- */
 
@@ -76,25 +75,28 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
     _;
   }
 
-  /// @notice ensure that the already redeemed slUSD in the actual block plus the amount to be redeemed is below the maxRedeemPerBlock var
-  /// @param redeemAmount The slUSD amount to be redeemed
-  modifier belowMaxRedeemPerBlock(uint256 redeemAmount) {
-    if (redeemedPerBlock[block.number] + redeemAmount > maxRedeemPerBlock) revert MaxRedeemPerBlockExceeded();
+  /// @notice ensure that the already burned slUSD in the actual block plus the amount to be burned is below the maxBurnPerBlock var
+  /// @param redeemAmount The slUSD amount to be burned
+  modifier belowMaxBurnPerBlock(uint256 redeemAmount) {
+    if (burnedPerBlock[block.number] + redeemAmount > maxBurnPerBlock) revert MaxBurnPerBlockExceeded();
     _;
   }
 
   /* --------------- CONSTRUCTOR --------------- */
 
-  constructor(IslUSD _slusd, uint256 _maxMintPerBlock, uint256 _maxRedeemPerBlock) {
-    if (address(_slusd) == address(0)) revert InvalidslUSDAddress();
+  constructor(IslUSD _slusd, IUSDsCooldown _usds, uint256 _maxMintPerBlock, uint256 _maxBurnPerBlock) {
+    if (address(_slusd) == address(0) || address(_usds) == address(0)) revert InvalidslUSDAddress();
     slusd = _slusd;
+    usds = _usds;
 
     // Set the max mint/redeem limits per block
     _setMaxMintPerBlock(_maxMintPerBlock);
-    _setMaxRedeemPerBlock(_maxRedeemPerBlock);
+    _setMaxBurnPerBlock(_maxBurnPerBlock);
 
     _chainId = block.chainid;
     _domainSeparator = _computeDomainSeparator();
+
+    _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
     emit slUSDSet(address(_slusd));
   }
@@ -109,45 +111,63 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
   }
 
   /// @notice Mint stablecoins from assets
-  function mint(address asset, uint256 amount) external override nonReentrant belowMaxMintPerBlock(amount) {
-    // Add to the minted amount in this block
-    mintedPerBlock[block.number] += amount;
-    _transferCollateralToCustodian(amount, asset, msg.sender);
-
-    uint256 assetRatio = getAssetRatio(asset);
-    uint256 slusdAmount = amount * assetRatio / 10000;
-
-    slusd.mint(msg.sender, slusdAmount);
-    emit Mint(msg.sender, asset, amount, slusdAmount);
+  function mint(address asset, uint256 amount) external nonReentrant belowMaxMintPerBlock(amount) {
+    _mint(asset, amount);
   }
 
-  /// @notice Redeem stablecoins for assets
-  function redeem(address asset, uint256 amount) external override nonReentrant belowMaxRedeemPerBlock(amount) {
-    // Add to the redeemed amount in this block
-    redeemedPerBlock[block.number] += amount;
+  function deposit(uint256 amount) external {
+    usds.deposit(amount, msg.sender);
+  }
+
+  function mintAndDeposit(address asset, uint256 amount) external {
+    uint256 slusdAmount = _mint(asset, amount);
+    usds.deposit(slusdAmount, msg.sender);
+  }
+
+  /// @notice Burn stablecoins for assets
+  function burn(address asset, uint256 amount) external nonReentrant belowMaxBurnPerBlock(amount) {
+    // Add to the burned amount in this block
+    burnedPerBlock[block.number] += amount;
     slusd.burnFrom(msg.sender, amount);
 
     uint256 assetRatio = getAssetRatio(asset);
     uint256 assetAmount = amount * 10000 / assetRatio;
 
     _transferToBeneficiary(msg.sender, asset, assetAmount);
-    emit Redeem(msg.sender, asset, assetAmount, amount);
+    emit Burn(msg.sender, asset, assetAmount, amount);
+  }
+
+  function redeem(uint256 shares) external {
+    usds.cooldownShares(shares, msg.sender);
+  }
+
+  // function redeemAndBurn(uint256 shares, address asset) external {
+  //   // TODO
+  //   usds.cooldownShares(shares, msg.sender);
+  // }
+
+  function unstake() external {
+    usds.unstake(msg.sender);
+  }
+
+  function rescueTokens(address token, uint256 amount, address to) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    IERC20(token).safeTransfer(to, amount);
   }
 
   /// @notice Sets the max mintPerBlock limit
-  function setMaxMintPerBlock(uint256 _maxMintPerBlock) external onlyOwner {
+  function setMaxMintPerBlock(uint256 _maxMintPerBlock) external onlyRole(DEFAULT_ADMIN_ROLE) {
     _setMaxMintPerBlock(_maxMintPerBlock);
   }
 
   /// @notice Sets the max redeemPerBlock limit
-  function setMaxRedeemPerBlock(uint256 _maxRedeemPerBlock) external onlyOwner {
-    _setMaxRedeemPerBlock(_maxRedeemPerBlock);
+  function setMaxBurnPerBlock(uint256 _maxBurnPerBlock) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    _setMaxBurnPerBlock(_maxBurnPerBlock);
   }
 
   /// @notice Disables the mint and redeem
-  function disableMintRedeem() external onlyOwner {
+  function disableMintBurn() external onlyRole(DEFAULT_ADMIN_ROLE) {
     _setMaxMintPerBlock(0);
-    _setMaxRedeemPerBlock(0);
+    _setMaxBurnPerBlock(0);
   }
 
   /* --------------- PUBLIC --------------- */
@@ -165,7 +185,7 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
   }
 
   /// @notice Adds an asset to the supported assets list.
-  function addSupportedAsset(address asset, uint256 ratio) public onlyOwner {
+  function addSupportedAsset(address asset, uint256 ratio) public onlyRole(DEFAULT_ADMIN_ROLE) {
     if (asset == address(0) || asset == address(slusd) || !(_supportedAssets[asset] == 0)) revert InvalidAssetAddress();
     if (ratio == 0) revert InvalidAssetRatio();
 
@@ -175,7 +195,7 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
   }
 
   /// @notice Removes an asset from the supported assets list
-  function removeSupportedAsset(address asset) public onlyOwner {
+  function removeSupportedAsset(address asset) public onlyRole(DEFAULT_ADMIN_ROLE) {
     if (_supportedAssets[asset] == 0) revert InvalidAssetAddress();
 
     _supportedAssets[asset] = 0;
@@ -184,7 +204,7 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
   }
 
   /// @notice Adds an custodian to the supported custodians list.
-  function setCustodianAddress(address custodian) public onlyOwner {
+  function setCustodianAddress(address custodian) public onlyRole(DEFAULT_ADMIN_ROLE) {
     if (custodian == address(0) || custodian == address(slusd) || custodian == custodianAddress) {
       revert InvalidCustodianAddress();
     }
@@ -206,16 +226,34 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
 
   /* --------------- INTERNAL --------------- */
 
+  function _mint(address asset, uint256 amount) internal returns (uint256) {
+    // Add to the minted amount in this block
+    mintedPerBlock[block.number] += amount;
+    _transferCollateralToCustodian(amount, asset, msg.sender);
+
+    uint256 assetRatio = getAssetRatio(asset);
+    uint256 slusdAmount = amount * assetRatio; // FIXME ratio(UDST -> slUSD) = 1 * 10e12
+
+    slusd.mint(msg.sender, slusdAmount);
+    emit Mint(msg.sender, asset, amount, slusdAmount);
+
+    return slusdAmount;
+  }
+
   /// @notice transfer supported asset to beneficiary address
   function _transferToBeneficiary(address beneficiary, address asset, uint256 amount) internal {
-    if (asset == NATIVE_TOKEN) {
-      if (address(this).balance < amount) revert InvalidAmount();
-      (bool success,) = (beneficiary).call{value: amount}("");
-      if (!success) revert TransferFailed();
-    } else {
-      if (_supportedAssets[asset] == 0) revert UnsupportedAsset();
-      IERC20(asset).safeTransfer(beneficiary, amount);
-    }
+    // FIXME
+    // if (asset == NATIVE_TOKEN) {
+    //   if (address(this).balance < amount) revert InvalidAmount();
+    //   (bool success,) = (beneficiary).call{value: amount}("");
+    //   if (!success) revert TransferFailed();
+    // } else {
+    //   if (_supportedAssets[asset] == 0) revert UnsupportedAsset();
+    //   IERC20(asset).safeTransfer(beneficiary, amount);
+    // }
+
+    if (_supportedAssets[asset] == 0) revert UnsupportedAsset();
+    IERC20(asset).safeTransfer(beneficiary, amount);
   }
 
   /// @notice transfer supported asset to array of custody addresses per defined ratio
@@ -238,10 +276,10 @@ contract ShieldLayerMinting is Ownable2Step, IShieldLayerMinting, ReentrancyGuar
   }
 
   /// @notice Sets the max redeemPerBlock limit
-  function _setMaxRedeemPerBlock(uint256 _maxRedeemPerBlock) internal {
-    uint256 oldMaxRedeemPerBlock = maxRedeemPerBlock;
-    maxRedeemPerBlock = _maxRedeemPerBlock;
-    emit MaxRedeemPerBlockChanged(oldMaxRedeemPerBlock, maxRedeemPerBlock);
+  function _setMaxBurnPerBlock(uint256 _maxBurnPerBlock) internal {
+    uint256 oldMaxBurnPerBlock = maxBurnPerBlock;
+    maxBurnPerBlock = _maxBurnPerBlock;
+    emit MaxBurnPerBlockChanged(oldMaxBurnPerBlock, maxBurnPerBlock);
   }
 
   /// @notice Compute the current domain separator

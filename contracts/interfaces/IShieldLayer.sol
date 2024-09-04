@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import "./IShieldLayerMintingEvents.sol";
+import "./IShieldLayerEvents.sol";
 
-interface IShieldLayerMinting is IShieldLayerMintingEvents {
+interface IShieldLayer is IShieldLayerEvents {
   enum Role {
     Minter,
     Redeemer
@@ -32,9 +32,19 @@ interface IShieldLayerMinting is IShieldLayerMintingEvents {
   error SignatureExpired();
   error TransferFailed();
   error MaxMintPerBlockExceeded();
-  error MaxRedeemPerBlockExceeded();
+  error MaxBurnPerBlockExceeded();
 
   function mint(address asset, uint256 amount) external;
 
-  function redeem(address asset, uint256 amount) external;
+  function deposit(uint256 amount) external;
+
+  function mintAndDeposit(address asset, uint256 amount) external;
+
+  function burn(address asset, uint256 amount) external;
+
+  function redeem(uint256 shares) external;
+
+  // function redeemAndBurn(uint256 shares, address asset) external;
+
+  function rescueTokens(address token, uint256 amount, address to) external;
 }

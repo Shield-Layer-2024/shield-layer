@@ -4,48 +4,30 @@ pragma solidity 0.8.19;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
-import "@openzeppelin/contracts/access/Ownable2Step.sol";
-import "./interfaces/IslUSDDefinitions.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import "./SingleAdminAccessControl.sol";
 
 /**
  * @title slUSD
  * @notice Stable Coin Contract
  * @dev Only a single approved minter can mint new tokens
  */
-contract slUSD is Ownable2Step, ERC20Burnable, ERC20Permit, IslUSDDefinitions {
-  mapping(address => bool) public minters;
+contract slUSD is SingleAdminAccessControl, ERC20Burnable, ERC20Permit {
+  using SafeERC20 for IERC20;
 
-  constructor(address admin) ERC20("slUSD", "slUSD") ERC20Permit("slUSD") {
-    if (admin == address(0)) revert ZeroAddressException();
+  /* ------------- ROLES ------------- */
+  bytes32 private constant CONTROLLER_ROLE = keccak256("CONTROLLER_ROLE");
 
-    _transferOwnership(admin);
+  constructor() ERC20("slUSD", "slUSD") ERC20Permit("slUSD") {
+    _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
   }
 
-  function addMinter(address minter) external onlyOwner {
-    if (minters[minter]) revert MinterDuplicated();
-
-    emit MinterAdded(minter);
-    minters[minter] = true;
-  }
-
-  function removeMinter(address minter) external onlyOwner {
-    if (!minters[minter]) revert MinterNotFound();
-
-    emit MinterRemoved(minter);
-    delete minters[minter];
-  }
-
-  function mint(address to, uint256 amount) external {
-    if (!minters[msg.sender]) revert OnlyMinter();
-
+  function mint(address to, uint256 amount) external onlyRole(CONTROLLER_ROLE) {
     _mint(to, amount);
   }
 
-  function renounceOwnership() public view override onlyOwner {
-    revert CantRenounceOwnership();
-  }
-
-  function decimals() public pure override returns (uint8) {
-    return 6;
+  function rescueTokens(address token, uint256 amount, address to) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    IERC20(token).safeTransfer(to, amount);
   }
 }
