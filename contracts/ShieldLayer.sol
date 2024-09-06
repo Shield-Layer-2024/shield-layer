@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-import "./interfaces/IslUSD.sol";
+import "./interfaces/ISLUSD.sol";
 import "./interfaces/IUSDsCooldown.sol";
 import "./interfaces/IShieldLayer.sol";
 import "./SingleAdminAccessControl.sol";
@@ -42,7 +42,7 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
   /* --------------- STATE VARIABLES --------------- */
 
   /// @notice slusd stablecoin
-  IslUSD public slusd;
+  ISLUSD public slusd;
   IUSDsCooldown public usds;
 
   /// @notice Supported assets
@@ -84,7 +84,7 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
 
   /* --------------- CONSTRUCTOR --------------- */
 
-  constructor(IslUSD _slusd, IUSDsCooldown _usds, uint256 _maxMintPerBlock, uint256 _maxBurnPerBlock) {
+  constructor(ISLUSD _slusd, IUSDsCooldown _usds, uint256 _maxMintPerBlock, uint256 _maxBurnPerBlock) {
     if (address(_slusd) == address(0) || address(_usds) == address(0)) revert InvalidslUSDAddress();
     slusd = _slusd;
     usds = _usds;

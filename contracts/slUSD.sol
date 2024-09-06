@@ -9,15 +9,15 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./SingleAdminAccessControl.sol";
 
 /**
- * @title slUSD
+ * @title SLUSD
  * @notice Stable Coin Contract
  * @dev Only a single approved minter can mint new tokens
  */
-contract slUSD is SingleAdminAccessControl, ERC20Burnable, ERC20Permit {
+contract SLUSD is SingleAdminAccessControl, ERC20Burnable, ERC20Permit {
   using SafeERC20 for IERC20;
 
   /* ------------- ROLES ------------- */
-  bytes32 private constant CONTROLLER_ROLE = keccak256("CONTROLLER_ROLE");
+  bytes32 internal constant CONTROLLER_ROLE = keccak256("CONTROLLER_ROLE");
 
   constructor() ERC20("slUSD", "slUSD") ERC20Permit("slUSD") {
     _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);

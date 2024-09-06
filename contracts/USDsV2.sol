@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 
 import "./interfaces/IUSDsCooldown.sol";
-import "./slUSDSilo.sol";
+import "./ShieldLayerSilo.sol";
 import "./USDs.sol";
 
 /**
@@ -20,9 +20,9 @@ contract USDsV2 is IUSDsCooldown, USDs {
 
   mapping(address => UserCooldown) public cooldowns;
 
-  slUSDSilo public silo;
+  ShieldLayerSilo public silo;
 
-  uint24 public MAX_COOLDOWN_DURATION = 90 days;
+  uint24 internal constant MAX_COOLDOWN_DURATION = 90 days;
 
   uint24 public cooldownDuration;
 
@@ -40,9 +40,8 @@ contract USDsV2 is IUSDsCooldown, USDs {
 
   /// @notice Constructor for USDsV2 contract.
   /// @param _asset The address of the USDe token.
-  constructor(IERC20 _asset) USDs(_asset) {
-    silo = new slUSDSilo(address(this), address(_asset));
-    cooldownDuration = MAX_COOLDOWN_DURATION;
+  constructor(IERC20 _asset, ShieldLayerSilo _silo) USDs(_asset) {
+    silo = _silo;
   }
 
   /* ------------- EXTERNAL ------------- */
@@ -84,7 +83,7 @@ contract USDsV2 is IUSDsCooldown, USDs {
       userCooldown.cooldownEnd = 0;
       userCooldown.underlyingAmount = 0;
 
-      silo.withdraw(receiver, assets);
+      silo.withdraw(asset(), receiver, assets);
     } else {
       revert InvalidCooldown();
     }

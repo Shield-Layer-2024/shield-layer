@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 
 import "./ISingleAdminAccessControl.sol";
 
-interface IslUSD is ISingleAdminAccessControl, IERC20, IERC20Permit, IERC20Metadata {
+interface ISLUSD is ISingleAdminAccessControl, IERC20, IERC20Permit, IERC20Metadata {
   function mint(address _to, uint256 _amount) external;
 
   function burn(uint256 _amount) external;

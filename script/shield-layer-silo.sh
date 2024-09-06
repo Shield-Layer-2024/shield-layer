@@ -1,6 +1,6 @@
 # Sepolia
 forge create \
-    contracts/SLUSD.sol:SLUSD \
+    contracts/ShieldLayerSilo.sol:ShieldLayerSilo \
     --chain-id 11155111 \
     --rpc-url https://sepolia.infura.io/v3/ccf0630254a74d5d9bd148b2681eca24 \
     --private-key $EVM_PRIVATE_KEY \
@@ -13,4 +13,4 @@ forge verify-contract \
     --compiler-version "0.8.19+commit.7dd6d404" \
     --constructor-args \
     $(cast abi-encode "constructor()") \
-    "0x429184F02cE0d26F82Eb91c21062deb2859E9288" "SLUSD"
+    "0x60156c104d41a1A6F4D9acd32b930d24218d557C" "ShieldLayerSilo"

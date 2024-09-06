@@ -97,7 +97,7 @@ contract USDs is SingleAdminAccessControl, ReentrancyGuard, ERC20Permit, ERC4626
   /* ------------- PUBLIC ------------- */
 
   function deposit(uint256 assets, address receiver) public virtual override(IERC4626, ERC4626) returns (uint256) {
-    super.deposit(assets, receiver);
+    return super.deposit(assets, receiver);
   }
 
   /**

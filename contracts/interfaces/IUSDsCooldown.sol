@@ -17,6 +17,8 @@ interface IUSDsCooldown is IUSDs {
   event SiloUpdated(address previousSilo, address newSilo);
 
   // Errors //
+  /// @notice Error emitted when the silo address is zero
+  error InvalidSiloAddress();
   /// @notice Error emitted when the shares amount to redeem is greater than the shares balance of the owner
   error ExcessiveRedeemAmount();
   /// @notice Error emitted when the shares amount to withdraw is greater than the shares balance of the owner
