@@ -13,4 +13,4 @@ forge verify-contract \
     --compiler-version "0.8.19+commit.7dd6d404" \
     --constructor-args \
     $(cast abi-encode "constructor()") \
-    "0x429184F02cE0d26F82Eb91c21062deb2859E9288" "SLUSD"
+    "0xFFaCfE58d94B041655e46bD4f77DBDc8330c6Eaf" "SLUSD"
