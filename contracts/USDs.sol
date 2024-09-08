@@ -96,8 +96,13 @@ contract USDs is SingleAdminAccessControl, ReentrancyGuard, ERC20Permit, ERC4626
 
   /* ------------- PUBLIC ------------- */
 
-  function deposit(uint256 assets, address receiver) public virtual override(IERC4626, ERC4626) returns (uint256) {
-    return super.deposit(assets, receiver);
+  function deposit(uint256 assets, address caller) public virtual override(IERC4626, ERC4626) returns (uint256) {
+    require(assets <= maxDeposit(caller), "ERC4626: deposit more than max");
+
+    uint256 shares = previewDeposit(assets);
+    _deposit(caller, assets, shares);
+
+    return shares;
   }
 
   /**
@@ -136,19 +141,17 @@ contract USDs is SingleAdminAccessControl, ReentrancyGuard, ERC20Permit, ERC4626
   /**
    * @dev Deposit/mint common workflow.
    * @param caller sender of assets
-   * @param receiver where to send shares
    * @param assets assets to deposit
    * @param shares shares to mint
    */
-  function _deposit(address caller, address receiver, uint256 assets, uint256 shares)
+  function _deposit(address caller, uint256 assets, uint256 shares)
     internal
-    override
     nonReentrant
     notZero(assets)
     notZero(shares)
     onlyRole(CONTROLLER_ROLE)
   {
-    super._deposit(caller, receiver, assets, shares);
+    super._deposit(caller, caller, assets, shares);
     _checkMinShares();
   }
 

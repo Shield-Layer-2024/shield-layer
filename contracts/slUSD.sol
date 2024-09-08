@@ -13,7 +13,7 @@ import "./SingleAdminAccessControl.sol";
  * @notice Stable Coin Contract
  * @dev Only a single approved minter can mint new tokens
  */
-contract SLUSD is SingleAdminAccessControl, ERC20Burnable, ERC20Permit {
+contract SLUSD is ERC20, ERC20Permit, ERC20Burnable, SingleAdminAccessControl {
   using SafeERC20 for IERC20;
 
   /* ------------- ROLES ------------- */

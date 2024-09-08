@@ -6,13 +6,14 @@ pragma solidity 0.8.19;
  */
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-import "./interfaces/ISLUSD.sol";
-import "./interfaces/IUSDsCooldown.sol";
 import "./interfaces/IShieldLayer.sol";
 import "./SingleAdminAccessControl.sol";
+import "./SLUSD.sol";
+import "./USDsV2.sol";
 
 /**
  * @title ShieldLayer
@@ -42,8 +43,8 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
   /* --------------- STATE VARIABLES --------------- */
 
   /// @notice slusd stablecoin
-  ISLUSD public slusd;
-  IUSDsCooldown public usds;
+  SLUSD public slusd;
+  USDsV2 public usds;
 
   /// @notice Supported assets
   mapping(address => uint256) internal _supportedAssets;
@@ -68,6 +69,18 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
 
   /* --------------- MODIFIERS --------------- */
 
+  /// @notice cannot mint before custodian is not set
+  modifier ensureCustodian() {
+    if (custodianAddress == address(0)) revert InvalidCustodianAddress();
+    _;
+  }
+
+  /// @notice cannot mint using unsupported asset or native ETH even if it is supported for redemptions
+  modifier ensureAssetSupported(address asset) {
+    if (_supportedAssets[asset] == 0 || asset == NATIVE_TOKEN) revert UnsupportedAsset();
+    _;
+  }
+
   /// @notice ensure that the already minted slUSD in the actual block plus the amount to be minted is below the maxMintPerBlock var
   /// @param mintAmount The slUSD amount to be minted
   modifier belowMaxMintPerBlock(uint256 mintAmount) {
@@ -84,7 +97,7 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
 
   /* --------------- CONSTRUCTOR --------------- */
 
-  constructor(ISLUSD _slusd, IUSDsCooldown _usds, uint256 _maxMintPerBlock, uint256 _maxBurnPerBlock) {
+  constructor(SLUSD _slusd, USDsV2 _usds, uint256 _maxMintPerBlock, uint256 _maxBurnPerBlock) {
     if (address(_slusd) == address(0) || address(_usds) == address(0)) revert InvalidslUSDAddress();
     slusd = _slusd;
     usds = _usds;
@@ -178,10 +191,13 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
   }
 
   /// @notice Get asset swap ratio
-  function getAssetRatio(address asset) public view returns (uint256) {
-    if (_supportedAssets[asset] == 0) revert UnsupportedAsset();
-
+  function getAssetRatio(address asset) public view ensureAssetSupported(asset) returns (uint256) {
     return _supportedAssets[asset];
+  }
+
+  function previewMint(address asset, uint256 amount) public view ensureAssetSupported(asset) returns (uint256) {
+    uint256 assetRatio = getAssetRatio(asset);
+    return amount * assetRatio; // FIXME ratio(UDST -> slUSD) = 1 * 10e12
   }
 
   /// @notice Adds an asset to the supported assets list.
@@ -231,8 +247,7 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
     mintedPerBlock[block.number] += amount;
     _transferCollateralToCustodian(amount, asset, msg.sender);
 
-    uint256 assetRatio = getAssetRatio(asset);
-    uint256 slusdAmount = amount * assetRatio; // FIXME ratio(UDST -> slUSD) = 1 * 10e12
+    uint256 slusdAmount = previewMint(asset, amount);
 
     slusd.mint(msg.sender, slusdAmount);
     emit Mint(msg.sender, asset, amount, slusdAmount);
@@ -264,7 +279,6 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
     if (_supportedAssets[asset] == 0 || asset == NATIVE_TOKEN) revert UnsupportedAsset();
 
     IERC20 token = IERC20(asset);
-
     token.safeTransferFrom(from, custodianAddress, amount);
   }
 
