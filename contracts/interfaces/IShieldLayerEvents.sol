@@ -9,7 +9,7 @@ interface IShieldLayerEvents {
   event Mint(address minter, address indexed asset, uint256 indexed amount, uint256 indexed slusdAmount);
 
   /// @notice Event emitted when funds are burned
-  event Burn(address redeemer, address indexed asset, uint256 indexed amount, uint256 indexed slusdAmount);
+  event Redeem(address redeemer, address indexed asset, uint256 indexed amount, uint256 indexed slusdAmount);
 
   /// @notice Event emitted when custody wallet is added
   event CustodyWalletAdded(address wallet);

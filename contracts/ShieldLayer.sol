@@ -128,39 +128,37 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
     _mint(asset, amount);
   }
 
-  function deposit(uint256 amount) external {
+  function stake(uint256 amount) external {
     usds.deposit(amount, msg.sender);
   }
 
-  function mintAndDeposit(address asset, uint256 amount) external {
+  function mintAndStake(address asset, uint256 amount) external {
     uint256 slusdAmount = _mint(asset, amount);
+    slusd.approve(address(usds), slusdAmount);
     usds.deposit(slusdAmount, msg.sender);
   }
 
-  /// @notice Burn stablecoins for assets
-  function burn(address asset, uint256 amount) external nonReentrant belowMaxBurnPerBlock(amount) {
+  /// @notice Redeem stablecoins for assets
+  function redeem(address asset, uint256 amount) external nonReentrant belowMaxBurnPerBlock(amount) {
+    uint256 assetRatio = getAssetRatio(asset);
+    uint256 assetAmount = amount / assetRatio;
+
+    if (IERC20(asset).balanceOf(address(this)) < assetAmount) revert InsufficientAsset();
+
     // Add to the burned amount in this block
     burnedPerBlock[block.number] += amount;
     slusd.burnFrom(msg.sender, amount);
 
-    uint256 assetRatio = getAssetRatio(asset);
-    uint256 assetAmount = amount * 10000 / assetRatio;
-
     _transferToBeneficiary(msg.sender, asset, assetAmount);
-    emit Burn(msg.sender, asset, assetAmount, amount);
+    emit Redeem(msg.sender, asset, assetAmount, amount);
   }
-
-  function redeem(uint256 shares) external {
-    usds.cooldownShares(shares, msg.sender);
-  }
-
-  // function redeemAndBurn(uint256 shares, address asset) external {
-  //   // TODO
-  //   usds.cooldownShares(shares, msg.sender);
-  // }
 
   function unstake() external {
     usds.unstake(msg.sender);
+  }
+
+  function cooldownShares(uint256 shares) external {
+    usds.cooldownShares(shares, msg.sender);
   }
 
   function rescueTokens(address token, uint256 amount, address to) external onlyRole(DEFAULT_ADMIN_ROLE) {

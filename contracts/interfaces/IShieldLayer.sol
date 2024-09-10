@@ -4,16 +4,6 @@ pragma solidity 0.8.19;
 import "./IShieldLayerEvents.sol";
 
 interface IShieldLayer is IShieldLayerEvents {
-  enum Role {
-    Minter,
-    Redeemer
-  }
-
-  struct Order {
-    address asset;
-    uint256 amount;
-  }
-
   error Duplicate();
   error InvalidAddress();
   error InvalidslUSDAddress();
@@ -24,6 +14,7 @@ interface IShieldLayer is IShieldLayerEvents {
   error InvalidOrder();
   error InvalidAffirmedAmount();
   error InvalidAmount();
+  error InsufficientAsset();
   error InvalidRoute();
   error UnsupportedAsset();
   error NoAssetsProvided();
@@ -36,15 +27,15 @@ interface IShieldLayer is IShieldLayerEvents {
 
   function mint(address asset, uint256 amount) external;
 
-  function deposit(uint256 amount) external;
+  function stake(uint256 amount) external;
 
-  function mintAndDeposit(address asset, uint256 amount) external;
+  function mintAndStake(address asset, uint256 amount) external;
 
-  function burn(address asset, uint256 amount) external;
+  function redeem(address asset, uint256 amount) external;
 
-  function redeem(uint256 shares) external;
+  function cooldownShares(uint256 shares) external;
 
-  // function redeemAndBurn(uint256 shares, address asset) external;
+  function unstake() external;
 
   function rescueTokens(address token, uint256 amount, address to) external;
 }
