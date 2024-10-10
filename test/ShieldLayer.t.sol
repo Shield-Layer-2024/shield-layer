@@ -12,7 +12,7 @@ import "../contracts/ShieldLayerSilo.sol";
 import "../contracts/mock/MockUSDT.sol";
 
 contract ShieldLayerTest is Test {
-  MockToken public usdtToken;
+  MockUSDT public usdtToken;
   SLUSD public slusdToken;
   ShieldLayerSilo public silo;
   USDsV2 public usdsToken;
@@ -34,7 +34,7 @@ contract ShieldLayerTest is Test {
     tester = vm.addr(_testerPrivateKey);
     custodian = vm.addr(_custodianPrivateKey);
 
-    usdtToken = new MockToken("USDT", "USDT", 6, tester);
+    usdtToken = new MockUSDT();
     slusdToken = new SLUSD();
     silo = new ShieldLayerSilo();
     usdsToken = new USDsV2(slusdToken, silo);
@@ -103,15 +103,16 @@ contract ShieldLayerTest is Test {
 
     vm.startPrank(tester);
     usdtToken.approve(address(shieldLayer), 1e6);
-    slusdToken.approve(address(shieldLayer), 1e18);
     shieldLayer.mint(address(usdtToken), 1e6);
     vm.stopPrank();
 
     vm.prank(custodian);
     usdtToken.transfer(address(shieldLayer), 1e6);
 
-    vm.prank(tester);
+    vm.startPrank(tester);
+    slusdToken.approve(address(shieldLayer), 1e18);
     shieldLayer.redeem(address(usdtToken), 1e18);
+    vm.stopPrank();
 
     assertEq(usdtToken.balanceOf(tester), balance);
   }

@@ -6,17 +6,14 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 
-contract MockToken is ERC20, ERC20Permit {
+contract MockUSDT is ERC20, ERC20Permit {
   uint8 private __decimals;
 
-  constructor(string memory name, string memory symbol, uint8 _decimals, address owner)
-    ERC20(name, symbol)
-    ERC20Permit(name)
-  {
-    __decimals = _decimals;
-    require(owner != address(0), "Zero address not valid");
+  constructor() ERC20("USDT", "USDT") ERC20Permit("USDT") {
+    __decimals = 6;
+    require(msg.sender != address(0), "Zero address not valid");
 
-    _mint(owner, 100000000 * (10 ** _decimals));
+    _mint(msg.sender, 100000000 * (10 ** __decimals));
   }
 
   function decimals() public view override returns (uint8) {
