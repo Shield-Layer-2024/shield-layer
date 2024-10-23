@@ -42,8 +42,8 @@ contract ShieldLayerTest is Test {
 
     slusdToken.grantRole(CONTROLLER_ROLE, address(shieldLayer));
     usdsToken.grantRole(CONTROLLER_ROLE, address(shieldLayer));
-    usdsToken.grantRole(REWARDER_ROLE, rewarder);
     silo.grantRole(CONTROLLER_ROLE, address(usdsToken));
+    usdsToken.grantRole(REWARDER_ROLE, rewarder);
 
     shieldLayer.addSupportedAsset(address(usdtToken), 1e12);
     shieldLayer.setCustodianAddress(custodian);
