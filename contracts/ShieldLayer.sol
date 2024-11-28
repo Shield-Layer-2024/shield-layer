@@ -195,12 +195,12 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
 
   function previewMint(address asset, uint256 amount) public view ensureAssetSupported(asset) returns (uint256) {
     uint256 assetRatio = getAssetRatio(asset);
-    return amount * assetRatio; // FIXME ratio(UDST -> slUSD) = 1 * 10e12
+    return amount * assetRatio;
   }
 
   /// @notice Adds an asset to the supported assets list.
   function addSupportedAsset(address asset, uint256 ratio) public onlyRole(DEFAULT_ADMIN_ROLE) {
-    if (asset == address(0) || asset == address(slusd) || !(_supportedAssets[asset] == 0)) revert InvalidAssetAddress();
+    if (asset == address(0) || asset == address(slusd)) revert InvalidAssetAddress();
     if (ratio == 0) revert InvalidAssetRatio();
 
     _supportedAssets[asset] = ratio;

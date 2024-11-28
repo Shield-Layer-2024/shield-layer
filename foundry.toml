@@ -1,3 +1,6 @@
+[fmt]
+    tab_width = 2
+
 [profile.default]
     cache_path     = 'forge-cache'
     evm_version    = "shanghai"
@@ -8,6 +11,3 @@
     out            = "out"
     src            = "contracts"
     test           = 'test'
-
-[fmt]
-    tab_width = 2
