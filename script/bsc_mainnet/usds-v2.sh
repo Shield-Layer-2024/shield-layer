@@ -1,6 +1,6 @@
 # BSC
 forge create \
-    contracts/USDsV2.sol:USDsV2 \
+    contracts/stUSLTv2.sol:stUSLTv2 \
     --chain-id 56 \
     --rpc-url https://bsc-dataseed1.binance.org/ \
     --verifier-url https://api.bscscan.com/api \
@@ -9,4 +9,4 @@ forge create \
     --verify \
     --constructor-args "0x58D5F16289B6a4F826e730Ff196D0531d44FbaB9" "0xE649fF12a4f9b20882839c9C293C960A15acCbD1"
 
-# contructor(slusd, silo)
+# contructor(uslt, silo)

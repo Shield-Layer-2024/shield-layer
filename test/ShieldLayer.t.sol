@@ -8,14 +8,14 @@ import "../contracts/interfaces/IShieldLayer.sol";
 import "../contracts/RewardProxy.sol";
 import "../contracts/ShieldLayer.sol";
 import "../contracts/ShieldLayerSilo.sol";
-import "../contracts/SLUSD.sol";
-import "../contracts/USDsV2.sol";
+import "../contracts/USLT.sol";
+import "../contracts/stUSLTv2.sol";
 import "../contracts/mock/MockUSDT.sol";
 
 contract ShieldLayerTest is Test {
   MockUSDT public usdtToken;
-  SLUSD public slusdToken;
-  USDsV2 public usdsToken;
+  USLT public usltToken;
+  stUSLTv2 public stusltToken;
 
   ShieldLayer public shieldlayer;
   ShieldLayerSilo public shieldlayerSilo;
@@ -39,22 +39,22 @@ contract ShieldLayerTest is Test {
     rewarder = vm.addr(_rewarderPrivateKey);
 
     usdtToken = new MockUSDT();
-    slusdToken = new SLUSD();
+    usltToken = new USLT();
     shieldlayerSilo = new ShieldLayerSilo();
-    usdsToken = new USDsV2(slusdToken, shieldlayerSilo);
-    shieldlayer = new ShieldLayer(slusdToken, usdsToken, 2000000000000000000000000, 2000000000000000000000000);
-    rewardProxy = new RewardProxy(slusdToken, usdsToken, shieldlayer);
+    stusltToken = new stUSLTv2(usltToken, shieldlayerSilo);
+    shieldlayer = new ShieldLayer(usltToken, stusltToken, 2000000000000000000000000, 2000000000000000000000000);
+    rewardProxy = new RewardProxy(usltToken, stusltToken, shieldlayer);
 
-    slusdToken.grantRole(CONTROLLER_ROLE, address(shieldlayer));
-    slusdToken.grantRole(CONTROLLER_ROLE, address(rewardProxy));
-    usdsToken.grantRole(CONTROLLER_ROLE, address(shieldlayer));
-    shieldlayerSilo.grantRole(CONTROLLER_ROLE, address(usdsToken));
-    usdsToken.grantRole(REWARDER_ROLE, address(rewardProxy));
+    usltToken.grantRole(CONTROLLER_ROLE, address(shieldlayer));
+    usltToken.grantRole(CONTROLLER_ROLE, address(rewardProxy));
+    stusltToken.grantRole(CONTROLLER_ROLE, address(shieldlayer));
+    shieldlayerSilo.grantRole(CONTROLLER_ROLE, address(stusltToken));
+    stusltToken.grantRole(REWARDER_ROLE, address(rewardProxy));
     rewardProxy.grantRole(REWARDER_ROLE, rewarder);
 
     shieldlayer.addSupportedAsset(address(usdtToken), 1e12);
     shieldlayer.setCustodianAddress(custodian);
-    usdsToken.setCooldownDuration(7 days);
+    stusltToken.setCooldownDuration(7 days);
 
     usdtToken.mint(1e36, tester);
     usdtToken.mint(1e36, rewarder);
@@ -66,7 +66,7 @@ contract ShieldLayerTest is Test {
     shieldlayer.mint(address(usdtToken), 1e6);
     vm.stopPrank();
 
-    assertEq(slusdToken.balanceOf(tester), 1e6 * 1e12);
+    assertEq(usltToken.balanceOf(tester), 1e6 * 1e12);
   }
 
   function testCantRedeemInsufficientAsset() public {
@@ -83,21 +83,21 @@ contract ShieldLayerTest is Test {
   function testMintAndStake() public {
     vm.startPrank(tester);
     usdtToken.approve(address(shieldlayer), 1e36);
-    slusdToken.approve(address(usdsToken), 1e36);
+    usltToken.approve(address(stusltToken), 1e36);
     shieldlayer.mintAndStake(address(usdtToken), 1e6);
     vm.stopPrank();
 
-    assertEq(slusdToken.balanceOf(tester), 0);
-    assertEq(usdsToken.balanceOf(tester), 1e18);
+    assertEq(usltToken.balanceOf(tester), 0);
+    assertEq(stusltToken.balanceOf(tester), 1e18);
   }
 
   function testUnstake() public {
     vm.startPrank(tester);
     usdtToken.approve(address(shieldlayer), 1e36);
-    slusdToken.approve(address(usdsToken), 1e36);
+    usltToken.approve(address(stusltToken), 1e36);
     shieldlayer.mintAndStake(address(usdtToken), 1e6);
 
-    usdsToken.approve(address(shieldlayer), 1e18);
+    stusltToken.approve(address(shieldlayer), 1e18);
     shieldlayer.cooldownShares(1e18);
 
     vm.warp(block.timestamp + 8 days);
@@ -105,7 +105,7 @@ contract ShieldLayerTest is Test {
     shieldlayer.unstake();
     vm.stopPrank();
 
-    assertEq(slusdToken.balanceOf(tester), 1e18);
+    assertEq(usltToken.balanceOf(tester), 1e18);
   }
 
   function testRedeem() public {
@@ -120,7 +120,7 @@ contract ShieldLayerTest is Test {
     usdtToken.transfer(address(shieldlayer), 1e6);
 
     vm.startPrank(tester);
-    slusdToken.approve(address(shieldlayer), 1e18);
+    usltToken.approve(address(shieldlayer), 1e18);
     shieldlayer.redeem(address(usdtToken), 1e18);
     vm.stopPrank();
 
@@ -130,24 +130,24 @@ contract ShieldLayerTest is Test {
   function testTransferInReward() public {
     vm.startPrank(tester);
     usdtToken.approve(address(shieldlayer), 1e18);
-    slusdToken.approve(address(usdsToken), 1e18);
+    usltToken.approve(address(stusltToken), 1e18);
     shieldlayer.mintAndStake(address(usdtToken), 1e6);
     vm.stopPrank();
 
     vm.startPrank(rewarder);
     usdtToken.approve(address(rewardProxy), 1e6);
     rewardProxy.transferInRewards(usdtToken, 1e6);
-    console.logUint(usdsToken.previewRedeem(1e18));
+    console.logUint(stusltToken.previewRedeem(1e18));
     vm.warp(block.timestamp + 1 days);
 
     usdtToken.approve(address(rewardProxy), 2e6);
     rewardProxy.transferInRewards(usdtToken, 2e6);
-    console.logUint(usdsToken.previewRedeem(1e18));
+    console.logUint(stusltToken.previewRedeem(1e18));
     vm.warp(block.timestamp + 1 days);
 
     usdtToken.approve(address(rewardProxy), 3e6);
     rewardProxy.transferInRewards(usdtToken, 3e6);
-    console.logUint(usdsToken.previewRedeem(1e18));
+    console.logUint(stusltToken.previewRedeem(1e18));
     vm.stopPrank();
   }
 }

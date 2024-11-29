@@ -4,18 +4,18 @@ pragma solidity 0.8.19;
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 
-import "./interfaces/IUSDsCooldown.sol";
+import "./interfaces/IstUSLTCooldown.sol";
 import "./ShieldLayerSilo.sol";
-import "./USDs.sol";
+import "./stUSLT.sol";
 
 /**
- * @title USDsV2
- * @notice The USDsV2 contract allows users to stake USDe tokens and earn a portion of protocol LST and perpetual yield that is allocated
+ * @title stUSLTv2
+ * @notice The stUSLTv2 contract allows users to stake USDe tokens and earn a portion of protocol LST and perpetual yield that is allocated
  * to stakers by the Ethena DAO governance voted yield distribution algorithm.  The algorithm seeks to balance the stability of the protocol by funding
  * the protocol's insurance fund, DAO activities, and rewarding stakers with a portion of the protocol's yield.
- * @dev If cooldown duration is set to zero, the USDsV2 behavior changes to follow ERC4626 standard and disables cooldownShares and cooldownAssets methods. If cooldown duration is greater than zero, the ERC4626 withdrawal and redeem functions are disabled, breaking the ERC4626 standard, and enabling the cooldownShares and the cooldownAssets functions.
+ * @dev If cooldown duration is set to zero, the stUSLTv2 behavior changes to follow ERC4626 standard and disables cooldownShares and cooldownAssets methods. If cooldown duration is greater than zero, the ERC4626 withdrawal and redeem functions are disabled, breaking the ERC4626 standard, and enabling the cooldownShares and the cooldownAssets functions.
  */
-contract USDsV2 is IUSDsCooldown, USDs {
+contract stUSLTv2 is IstUSLTCooldown, stUSLT {
   using SafeERC20 for IERC20;
 
   mapping(address => UserCooldown) public cooldowns;
@@ -38,9 +38,9 @@ contract USDsV2 is IUSDsCooldown, USDs {
     _;
   }
 
-  /// @notice Constructor for USDsV2 contract.
+  /// @notice Constructor for stUSLTv2 contract.
   /// @param _asset The address of the USDe token.
-  constructor(IERC20 _asset, ShieldLayerSilo _silo) USDs(_asset) {
+  constructor(IERC20 _asset, ShieldLayerSilo _silo) stUSLT(_asset) {
     silo = _silo;
   }
 
@@ -131,7 +131,7 @@ contract USDsV2 is IUSDsCooldown, USDs {
     return assets;
   }
 
-  /// @notice Set cooldown duration. If cooldown duration is set to zero, the USDsV2 behavior changes to follow ERC4626 standard and disables cooldownShares and cooldownAssets methods. If cooldown duration is greater than zero, the ERC4626 withdrawal and redeem functions are disabled, breaking the ERC4626 standard, and enabling the cooldownShares and the cooldownAssets functions.
+  /// @notice Set cooldown duration. If cooldown duration is set to zero, the stUSLTv2 behavior changes to follow ERC4626 standard and disables cooldownShares and cooldownAssets methods. If cooldown duration is greater than zero, the ERC4626 withdrawal and redeem functions are disabled, breaking the ERC4626 standard, and enabling the cooldownShares and the cooldownAssets functions.
   /// @param duration Duration of the cooldown
   function setCooldownDuration(uint24 duration) external onlyRole(DEFAULT_ADMIN_ROLE) {
     if (duration > MAX_COOLDOWN_DURATION) {

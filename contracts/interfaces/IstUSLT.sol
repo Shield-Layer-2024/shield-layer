@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
-interface IUSDs is IERC4626 {
+interface IstUSLT is IERC4626 {
   // Events //
   /// @notice Event emitted when the rewards are received
   event RewardsReceived(uint256 indexed amount, uint256 newVestingUSDeAmount);

@@ -12,12 +12,12 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import "./interfaces/IShieldLayer.sol";
 import "./SingleAdminAccessControl.sol";
-import "./SLUSD.sol";
-import "./USDsV2.sol";
+import "./USLT.sol";
+import "./stUSLTv2.sol";
 
 /**
  * @title ShieldLayer
- * @notice This contract mints and redeems slUSD in a single, atomic, trustless transaction
+ * @notice This contract mints and redeems USLT in a single, atomic, trustless transaction
  */
 contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard {
   using SafeERC20 for IERC20;
@@ -42,9 +42,9 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
 
   /* --------------- STATE VARIABLES --------------- */
 
-  /// @notice slusd stablecoin
-  SLUSD public slusd;
-  USDsV2 public usds;
+  /// @notice uslt stablecoin
+  USLT public uslt;
+  stUSLTv2 public stuslt;
 
   /// @notice Supported assets
   mapping(address => uint256) internal _supportedAssets;
@@ -58,13 +58,13 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
   /// @notice holds computable domain separator
   bytes32 private immutable _domainSeparator;
 
-  /// @notice slUSD minted per block
+  /// @notice USLT minted per block
   mapping(uint256 => uint256) public mintedPerBlock;
-  /// @notice max minted slUSD allowed per block
+  /// @notice max minted USLT allowed per block
   uint256 public maxMintPerBlock;
-  /// @notice slUSD burned per block
+  /// @notice USLT burned per block
   mapping(uint256 => uint256) public burnedPerBlock;
-  /// @notice max burned slUSD allowed per block
+  /// @notice max burned USLT allowed per block
   uint256 public maxBurnPerBlock;
 
   /* --------------- MODIFIERS --------------- */
@@ -81,15 +81,15 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
     _;
   }
 
-  /// @notice ensure that the already minted slUSD in the actual block plus the amount to be minted is below the maxMintPerBlock var
-  /// @param mintAmount The slUSD amount to be minted
+  /// @notice ensure that the already minted USLT in the actual block plus the amount to be minted is below the maxMintPerBlock var
+  /// @param mintAmount The USLT amount to be minted
   modifier belowMaxMintPerBlock(uint256 mintAmount) {
     if (mintedPerBlock[block.number] + mintAmount > maxMintPerBlock) revert MaxMintPerBlockExceeded();
     _;
   }
 
-  /// @notice ensure that the already burned slUSD in the actual block plus the amount to be burned is below the maxBurnPerBlock var
-  /// @param redeemAmount The slUSD amount to be burned
+  /// @notice ensure that the already burned USLT in the actual block plus the amount to be burned is below the maxBurnPerBlock var
+  /// @param redeemAmount The USLT amount to be burned
   modifier belowMaxBurnPerBlock(uint256 redeemAmount) {
     if (burnedPerBlock[block.number] + redeemAmount > maxBurnPerBlock) revert MaxBurnPerBlockExceeded();
     _;
@@ -97,10 +97,10 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
 
   /* --------------- CONSTRUCTOR --------------- */
 
-  constructor(SLUSD _slusd, USDsV2 _usds, uint256 _maxMintPerBlock, uint256 _maxBurnPerBlock) {
-    if (address(_slusd) == address(0) || address(_usds) == address(0)) revert InvalidslUSDAddress();
-    slusd = _slusd;
-    usds = _usds;
+  constructor(USLT _uslt, stUSLTv2 _stuslt, uint256 _maxMintPerBlock, uint256 _maxBurnPerBlock) {
+    if (address(_uslt) == address(0) || address(_stuslt) == address(0)) revert InvalidUSLTAddress();
+    uslt = _uslt;
+    stuslt = _stuslt;
 
     // Set the max mint/redeem limits per block
     _setMaxMintPerBlock(_maxMintPerBlock);
@@ -111,7 +111,7 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
 
     _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
-    emit slUSDSet(address(_slusd));
+    emit USLTSet(address(_uslt));
   }
 
   /* --------------- EXTERNAL --------------- */
@@ -129,13 +129,13 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
   }
 
   function stake(uint256 amount) external {
-    usds.deposit(amount, msg.sender);
+    stuslt.deposit(amount, msg.sender);
   }
 
   function mintAndStake(address asset, uint256 amount) external {
-    uint256 slusdAmount = _mint(asset, amount);
-    slusd.approve(address(usds), slusdAmount);
-    usds.deposit(slusdAmount, msg.sender);
+    uint256 usltAmount = _mint(asset, amount);
+    uslt.approve(address(stuslt), usltAmount);
+    stuslt.deposit(usltAmount, msg.sender);
   }
 
   /// @notice Redeem stablecoins for assets
@@ -147,18 +147,18 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
 
     // Add to the burned amount in this block
     burnedPerBlock[block.number] += amount;
-    slusd.burnFrom(msg.sender, amount);
+    uslt.burnFrom(msg.sender, amount);
 
     _transferToBeneficiary(msg.sender, asset, assetAmount);
     emit Redeem(msg.sender, asset, assetAmount, amount);
   }
 
   function unstake() external {
-    usds.unstake(msg.sender);
+    stuslt.unstake(msg.sender);
   }
 
   function cooldownShares(uint256 shares) external {
-    usds.cooldownShares(shares, msg.sender);
+    stuslt.cooldownShares(shares, msg.sender);
   }
 
   function rescueTokens(address token, uint256 amount, address to) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -200,7 +200,7 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
 
   /// @notice Adds an asset to the supported assets list.
   function addSupportedAsset(address asset, uint256 ratio) public onlyRole(DEFAULT_ADMIN_ROLE) {
-    if (asset == address(0) || asset == address(slusd)) revert InvalidAssetAddress();
+    if (asset == address(0) || asset == address(uslt)) revert InvalidAssetAddress();
     if (ratio == 0) revert InvalidAssetRatio();
 
     _supportedAssets[asset] = ratio;
@@ -219,7 +219,7 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
 
   /// @notice Adds an custodian to the supported custodians list.
   function setCustodianAddress(address custodian) public onlyRole(DEFAULT_ADMIN_ROLE) {
-    if (custodian == address(0) || custodian == address(slusd) || custodian == custodianAddress) {
+    if (custodian == address(0) || custodian == address(uslt) || custodian == custodianAddress) {
       revert InvalidCustodianAddress();
     }
     custodianAddress = custodian;
@@ -245,12 +245,12 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
     mintedPerBlock[block.number] += amount;
     _transferCollateralToCustodian(amount, asset, msg.sender);
 
-    uint256 slusdAmount = previewMint(asset, amount);
+    uint256 usltAmount = previewMint(asset, amount);
 
-    slusd.mint(msg.sender, slusdAmount);
-    emit Mint(msg.sender, asset, amount, slusdAmount);
+    uslt.mint(msg.sender, usltAmount);
+    emit Mint(msg.sender, asset, amount, usltAmount);
 
-    return slusdAmount;
+    return usltAmount;
   }
 
   /// @notice transfer supported asset to beneficiary address

@@ -12,15 +12,15 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./SingleAdminAccessControl.sol";
-import "./interfaces/IUSDs.sol";
+import "./interfaces/IstUSLT.sol";
 
 /**
- * @title USDs
- * @notice The USDs contract allows users to stake USDs tokens and earn a portion of protocol LST and perpetual yield that is allocated
+ * @title stUSLT
+ * @notice The stUSLT contract allows users to stake stUSLT tokens and earn a portion of protocol LST and perpetual yield that is allocated
  * to stakers by the Ethena DAO governance voted yield distribution algorithm.  The algorithm seeks to balance the stability of the protocol by funding
  * the protocol's insurance fund, DAO activities, and rewarding stakers with a portion of the protocol's yield.
  */
-contract USDs is SingleAdminAccessControl, ReentrancyGuard, ERC20Permit, ERC4626, IUSDs {
+contract stUSLT is SingleAdminAccessControl, ReentrancyGuard, ERC20Permit, ERC4626, IstUSLT {
   using SafeERC20 for IERC20;
 
   /* ------------- ROLES ------------- */
@@ -53,10 +53,10 @@ contract USDs is SingleAdminAccessControl, ReentrancyGuard, ERC20Permit, ERC4626
   /* ------------- CONSTRUCTOR ------------- */
 
   /**
-   * @notice Constructor for USDs contract.
-   * @param _asset The address of the USDs token.
+   * @notice Constructor for stUSLT contract.
+   * @param _asset The address of the stUSLT token.
    */
-  constructor(IERC20 _asset) ERC20("USDs", "USDs") ERC4626(_asset) ERC20Permit("USDs") {
+  constructor(IERC20 _asset) ERC20("stUSLT", "stUSLT") ERC4626(_asset) ERC20Permit("stUSLT") {
     if (address(_asset) == address(0)) revert InvalidZeroAddress();
 
     _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -82,8 +82,8 @@ contract USDs is SingleAdminAccessControl, ReentrancyGuard, ERC20Permit, ERC4626
 
   /**
    * @notice Allows the owner to rescue tokens accidentally sent to the contract.
-   * Note that the owner cannot rescue USDs tokens because they functionally sit here
-   * and belong to stakers but can rescue staked USDs as they should never actually
+   * Note that the owner cannot rescue stUSLT tokens because they functionally sit here
+   * and belong to stakers but can rescue staked stUSLT as they should never actually
    * sit in this contract and a staker may well transfer them here by accident.
    * @param token The token to be rescued.
    * @param amount The amount of tokens to be rescued.
@@ -106,14 +106,14 @@ contract USDs is SingleAdminAccessControl, ReentrancyGuard, ERC20Permit, ERC4626
   }
 
   /**
-   * @notice Returns the amount of USDs tokens that are vested in the contract.
+   * @notice Returns the amount of stUSLT tokens that are vested in the contract.
    */
   function totalAssets() public view override(IERC4626, ERC4626) returns (uint256) {
     return IERC20(asset()).balanceOf(address(this)) - getUnvestedAmount();
   }
 
   /**
-   * @notice Returns the amount of USDs tokens that are unvested in the contract.
+   * @notice Returns the amount of stUSLT tokens that are unvested in the contract.
    */
   function getUnvestedAmount() public view returns (uint256) {
     uint256 timeSinceLastDistribution = block.timestamp - lastDistributionTimestamp;

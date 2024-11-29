@@ -1,6 +1,6 @@
 # BSC
 forge create \
-    contracts/SLUSD.sol:SLUSD \
+    contracts/USLT.sol:USLT \
     --chain-id 56 \
     --rpc-url https://bsc-dataseed1.binance.org/ \
     --verifier-url https://api.bscscan.com/api \

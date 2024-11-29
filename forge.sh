@@ -5,7 +5,7 @@ forge create \
     --private-key 0xae2c634eb0826b064ef7532c15641cfa45f0fcc1a273f9342b4c57263ef0c811 \
     --etherscan-api-key GS477KS4QNQTUUEHZSWP1UIBFAYDHWU9GV \
     --verify \
-    contracts/USDs.sol:USDs
+    contracts/stUSLT.sol:stUSLT
 
 forge test \
     --chain-id 11155111 \

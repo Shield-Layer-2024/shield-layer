@@ -6,7 +6,7 @@ import "./IShieldLayerEvents.sol";
 interface IShieldLayer is IShieldLayerEvents {
   error Duplicate();
   error InvalidAddress();
-  error InvalidslUSDAddress();
+  error InvalidUSLTAddress();
   error InvalidZeroAddress();
   error InvalidAssetAddress();
   error InvalidAssetRatio();

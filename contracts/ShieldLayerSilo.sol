@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./SingleAdminAccessControl.sol";
 
 /**
- * @title slUSDSilo
+ * @title USLTSilo
  * @notice The Silo allows to store USDe during the stake cooldown process.
  */
 contract ShieldLayerSilo is SingleAdminAccessControl {

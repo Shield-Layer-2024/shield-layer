@@ -5,11 +5,11 @@ interface IShieldLayerEvents {
   /// @notice Event emitted when contract receives ETH
   event Received(address, uint256);
 
-  /// @notice Event emitted when slUSD is minted
-  event Mint(address minter, address indexed asset, uint256 indexed amount, uint256 indexed slusdAmount);
+  /// @notice Event emitted when USLT is minted
+  event Mint(address minter, address indexed asset, uint256 indexed amount, uint256 indexed usltAmount);
 
   /// @notice Event emitted when funds are burned
-  event Redeem(address redeemer, address indexed asset, uint256 indexed amount, uint256 indexed slusdAmount);
+  event Redeem(address redeemer, address indexed asset, uint256 indexed amount, uint256 indexed usltAmount);
 
   /// @notice Event emitted when custody wallet is added
   event CustodyWalletAdded(address wallet);
@@ -32,8 +32,8 @@ interface IShieldLayerEvents {
   /// @notice Event emitted when assets are moved to custody provider wallet
   event CustodyTransfer(address indexed wallet, address indexed asset, uint256 amount);
 
-  /// @notice Event emitted when slUSD is set
-  event slUSDSet(address indexed slUSD);
+  /// @notice Event emitted when USLT is set
+  event USLTSet(address indexed USLT);
 
   /// @notice Event emitted when the max mint per block is changed
   event MaxMintPerBlockChanged(uint256 indexed oldMaxMintPerBlock, uint256 indexed newMaxMintPerBlock);
