@@ -8,7 +8,7 @@ import "./SingleAdminAccessControl.sol";
 
 /**
  * @title USLTSilo
- * @notice The Silo allows to store USDe during the stake cooldown process.
+ * @notice The Silo allows to store USLT during the stake cooldown process.
  */
 contract ShieldLayerSilo is SingleAdminAccessControl {
   using SafeERC20 for IERC20;
