@@ -115,14 +115,6 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
   }
 
   /* --------------- EXTERNAL --------------- */
-
-  /**
-   * @notice Fallback function to receive ether
-   */
-  receive() external payable {
-    emit Received(msg.sender, msg.value);
-  }
-
   /// @notice Mint stablecoins from assets
   function mint(address asset, uint256 amount) external nonReentrant belowMaxMintPerBlock(amount) {
     _mint(asset, amount);
