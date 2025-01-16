@@ -81,13 +81,6 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
     _;
   }
 
-  /// @notice ensure that the already minted USLT in the actual block plus the amount to be minted is below the maxMintPerBlock var
-  /// @param mintAmount The USLT amount to be minted
-  modifier belowMaxMintPerBlock(uint256 mintAmount) {
-    if (mintedPerBlock[block.number] + mintAmount > maxMintPerBlock) revert MaxMintPerBlockExceeded();
-    _;
-  }
-
   /// @notice ensure that the already burned USLT in the actual block plus the amount to be burned is below the maxBurnPerBlock var
   /// @param redeemAmount The USLT amount to be burned
   modifier belowMaxBurnPerBlock(uint256 redeemAmount) {
@@ -116,7 +109,7 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
 
   /* --------------- EXTERNAL --------------- */
   /// @notice Mint stablecoins from assets
-  function mint(address asset, uint256 amount) external nonReentrant belowMaxMintPerBlock(amount) {
+  function mint(address asset, uint256 amount) external nonReentrant {
     _mint(asset, amount);
   }
 
@@ -131,7 +124,7 @@ contract ShieldLayer is SingleAdminAccessControl, IShieldLayer, ReentrancyGuard 
   }
 
   /// @notice Redeem stablecoins for assets
-  function redeem(address asset, uint256 amount) external nonReentrant belowMaxBurnPerBlock(amount) {
+  function redeem(address asset, uint256 amount) external nonReentrant {
     uint256 assetRatio = getAssetRatio(asset);
     uint256 assetAmount = amount / assetRatio;
 
