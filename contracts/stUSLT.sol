@@ -70,6 +70,7 @@ contract stUSLT is SingleAdminAccessControl, ReentrancyGuard, ERC20Permit, ERC46
    */
   function transferInRewards(uint256 amount) external nonReentrant onlyRole(REWARDER_ROLE) notZero(amount) {
     if (getUnvestedAmount() > 0) revert StillVesting();
+    lastDistributionTimestamp = block.timestamp;
     IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
 
     emit RewardsReceived(amount, amount);
