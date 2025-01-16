@@ -127,12 +127,6 @@ contract stUSLT is SingleAdminAccessControl, ReentrancyGuard, ERC20Permit, ERC46
 
   /* ------------- INTERNAL ------------- */
 
-  /// @notice ensures a small non-zero amount of shares does not remain, exposing to donation attack
-  function _checkMinShares() internal view {
-    uint256 _totalSupply = totalSupply();
-    if (_totalSupply > 0 && _totalSupply < MIN_SHARES) revert MinSharesViolation();
-  }
-
   /**
    * @dev Deposit/mint common workflow.
    * @param caller sender of assets
@@ -147,7 +141,6 @@ contract stUSLT is SingleAdminAccessControl, ReentrancyGuard, ERC20Permit, ERC46
     onlyRole(CONTROLLER_ROLE)
   {
     super._deposit(caller, caller, assets, shares);
-    _checkMinShares();
   }
 
   /**
@@ -167,7 +160,6 @@ contract stUSLT is SingleAdminAccessControl, ReentrancyGuard, ERC20Permit, ERC46
     onlyRole(CONTROLLER_ROLE)
   {
     super._withdraw(caller, receiver, _owner, assets, shares);
-    _checkMinShares();
   }
 
   /**
