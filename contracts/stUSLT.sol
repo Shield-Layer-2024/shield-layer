@@ -16,9 +16,6 @@ import "./interfaces/IstUSLT.sol";
 
 /**
  * @title stUSLT
- * @notice The stUSLT contract allows users to stake stUSLT tokens and earn a portion of protocol LST and perpetual yield that is allocated
- * to stakers by the Ethena DAO governance voted yield distribution algorithm.  The algorithm seeks to balance the stability of the protocol by funding
- * the protocol's insurance fund, DAO activities, and rewarding stakers with a portion of the protocol's yield.
  */
 contract stUSLT is SingleAdminAccessControl, ReentrancyGuard, ERC20Permit, ERC4626, IstUSLT {
   using SafeERC20 for IERC20;

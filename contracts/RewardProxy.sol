@@ -11,9 +11,6 @@ import "./ShieldLayer.sol";
 
 /**
  * @title stUSLTv2
- * @notice The stUSLTv2 contract allows users to stake USDe tokens and earn a portion of protocol LST and perpetual yield that is allocated
- * to stakers by the Ethena DAO governance voted yield distribution algorithm.  The algorithm seeks to balance the stability of the protocol by funding
- * the protocol's insurance fund, DAO activities, and rewarding stakers with a portion of the protocol's yield.
  * @dev If cooldown duration is set to zero, the stUSLTv2 behavior changes to follow ERC4626 standard and disables cooldownShares and cooldownAssets methods. If cooldown duration is greater than zero, the ERC4626 withdrawal and redeem functions are disabled, breaking the ERC4626 standard, and enabling the cooldownShares and the cooldownAssets functions.
  */
 contract RewardProxy is SingleAdminAccessControl {
