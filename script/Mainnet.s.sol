@@ -51,8 +51,9 @@ forge script \
     --verify \
     --chain mainnet \
     --private-key $EVM_PRIVATE_KEY_NICKY \
-    --rpc-url https://eth.llamarpc.com \
+    --rpc-url https://mainnet.infura.io/v3/eb6afaaab98043f9b6bfeec22d24beae \
     --verifier etherscan \
     --verifier-url https://api.etherscan.io/api \
-    --etherscan-api-key GS477KS4QNQTUUEHZSWP1UIBFAYDHWU9GV
+    --etherscan-api-key GS477KS4QNQTUUEHZSWP1UIBFAYDHWU9GV \
+    --delay 5
 */
