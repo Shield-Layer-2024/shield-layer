@@ -46,7 +46,7 @@ contract MainnetDeploy is Script {
 
 /*
 forge script \
-    script/Mainnet.s.sol:BSCDeploy \
+    script/Mainnet.s.sol:MainnetDeploy \
     --broadcast \
     --verify \
     --chain mainnet \
