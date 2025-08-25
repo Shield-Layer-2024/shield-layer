@@ -1,0 +1,225 @@
+---
+globs: *.t.sol,test/**/*.sol
+description: Foundry测试框架最佳实践和约定
+---
+
+# Foundry 测试规范
+
+## 测试文件结构
+基于项目的 [ShieldLayer.t.sol](mdc:test/ShieldLayer.t.sol) 测试文件结构。
+
+### 文件命名
+- 测试文件使用 `.t.sol` 后缀
+- 测试合约名格式：`{ContractName}Test`
+- 测试函数名格式：`test{FunctionName}` 或 `test{Scenario}`
+
+### 导入顺序
+```solidity
+// 1. Foundry 测试框架
+import "forge-std/Test.sol";
+import {console} from "forge-std/console.sol";
+
+// 2. 项目接口
+import "../contracts/interfaces/IShieldLayer.sol";
+
+// 3. 项目合约（按依赖关系排序）
+import "../contracts/RewardProxy.sol";
+import "../contracts/ShieldLayer.sol";
+import "../contracts/ShieldLayerSilo.sol";
+import "../contracts/USLT.sol";
+import "../contracts/stUSLTv2.sol";
+
+// 4. Mock 合约
+import "../contracts/mock/MockUSDT.sol";
+```
+
+## 测试合约设置
+
+### 状态变量声明
+```solidity
+contract ShieldLayerTest is Test {
+    // 代币合约
+    MockUSDT public usdtToken;
+    USLT public usltToken;
+    stUSLTv2 public stusltToken;
+    
+    // 核心合约
+    ShieldLayer public shieldlayer;
+    ShieldLayerSilo public shieldlayerSilo;
+    RewardProxy public rewardProxy;
+    
+    // 测试账户
+    uint256 _testerPrivateKey = 0xA11CE;
+    uint256 _custodianPrivateKey = 0xA14CE;
+    uint256 _rewarderPrivateKey = 0xB44DE;
+    
+    address public tester;
+    address public custodian;
+    address public rewarder;
+    
+    // 角色常量
+    bytes32 CONTROLLER_ROLE = keccak256("CONTROLLER_ROLE");
+    bytes32 REWARDER_ROLE = keccak256("REWARDER_ROLE");
+}
+```
+
+### setUp 函数
+```solidity
+function setUp() public virtual {
+    // 1. 生成测试地址
+    tester = vm.addr(_testerPrivateKey);
+    custodian = vm.addr(_custodianPrivateKey);
+    rewarder = vm.addr(_rewarderPrivateKey);
+    
+    // 2. 部署合约
+    usdtToken = new MockUSDT();
+    usltToken = new USLT();
+    // ... 其他合约部署
+    
+    // 3. 设置权限和角色
+    usltToken.grantRole(CONTROLLER_ROLE, address(shieldlayer));
+    // ... 其他权限设置
+    
+    // 4. 初始化配置
+    shieldlayer.addSupportedAsset(address(usdtToken), 1e12);
+    shieldlayer.setCustodianAddress(custodian);
+    
+    // 5. 准备测试数据
+    usdtToken.mint(1e36, tester);
+    usdtToken.mint(1e36, rewarder);
+}
+```
+
+## 测试编写规范
+
+### 基础功能测试
+```solidity
+function testMint() public {
+    vm.startPrank(tester);
+    usdtToken.approve(address(shieldlayer), 1e36);
+    shieldlayer.mint(address(usdtToken), 1e6);
+    vm.stopPrank();
+    
+    assertEq(usltToken.balanceOf(tester), 1e6 * 1e12);
+}
+```
+
+### 错误情况测试
+```solidity
+function testCantRedeemInsufficientAsset() public {
+    vm.startPrank(tester);
+    usdtToken.approve(address(shieldlayer), 1e6);
+    shieldlayer.mint(address(usdtToken), 1e6);
+    vm.stopPrank();
+    
+    vm.prank(tester);
+    vm.expectRevert(abi.encodeWithSelector(IShieldLayer.InsufficientAsset.selector));
+    shieldlayer.redeem(address(usdtToken), 1e18);
+}
+```
+
+### 复杂流程测试
+```solidity
+function testMintAndStake() public {
+    vm.startPrank(tester);
+    usdtToken.approve(address(shieldlayer), 1e36);
+    usltToken.approve(address(stusltToken), 1e36);
+    shieldlayer.mintAndStake(address(usdtToken), 1e6);
+    vm.stopPrank();
+    
+    assertEq(usltToken.balanceOf(tester), 0);
+    assertEq(stusltToken.balanceOf(tester), 1e18);
+}
+```
+
+## 测试工具和技巧
+
+### 使用 vm cheatcodes
+```solidity
+// 时间控制
+vm.warp(block.timestamp + 8 days);
+
+// 用户切换
+vm.startPrank(tester);
+// 执行操作
+vm.stopPrank();
+
+// 单次调用身份
+vm.prank(custodian);
+
+// 期望错误
+vm.expectRevert(abi.encodeWithSelector(IShieldLayer.InsufficientAsset.selector));
+```
+
+### 断言最佳实践
+```solidity
+// 精确相等断言
+assertEq(actualValue, expectedValue);
+
+// 余额变化断言
+uint256 balanceBefore = token.balanceOf(user);
+// 执行操作
+uint256 balanceAfter = token.balanceOf(user);
+assertEq(balanceAfter - balanceBefore, expectedChange);
+```
+
+### 调试输出
+```solidity
+// 使用 console.log 进行调试
+console.logUint(stusltToken.previewRedeem(1e18));
+console.logAddress(custodianAddress);
+console.logString("Debug message");
+```
+
+## 测试数据约定
+
+### 金额设置
+- 使用科学计数法：`1e6` (1,000,000), `1e18` (1 ETH)
+- USDT 使用 6 位小数：`1e6 = 1 USDT`
+- USLT 使用 18 位小数：`1e18 = 1 USLT`
+- 大额测试金额：`1e36` (充足的余额)
+
+### 测试账户
+- `tester`: 主要测试用户
+- `custodian`: 托管地址
+- `rewarder`: 奖励分发者
+- 使用固定的私钥便于调试
+
+### 角色和权限
+- 明确定义角色常量
+- 在 setUp 中正确配置所有必要权限
+- 测试访问控制功能
+
+## Gas 优化测试
+```solidity
+function testGasOptimization() public {
+    uint256 gasBefore = gasleft();
+    // 执行操作
+    shieldlayer.mint(address(usdtToken), 1e6);
+    uint256 gasUsed = gasBefore - gasleft();
+    
+    // 验证 gas 使用量在合理范围内
+    assertLt(gasUsed, 200000); // 小于 200k gas
+}
+```
+
+## Fuzz 测试
+```solidity
+function testFuzzMint(uint256 amount) public {
+    // 限制输入范围
+    vm.assume(amount > 0 && amount <= 1e12);
+    
+    vm.startPrank(tester);
+    usdtToken.approve(address(shieldlayer), amount);
+    shieldlayer.mint(address(usdtToken), amount);
+    vm.stopPrank();
+    
+    assertEq(usltToken.balanceOf(tester), amount * 1e12);
+}
+```
+
+## 测试覆盖率目标
+- 函数覆盖率：100%
+- 分支覆盖率：> 90%
+- 行覆盖率：> 95%
+- 包含边界条件和错误路径测试

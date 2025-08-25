@@ -1,0 +1,364 @@
+---
+globs: script/**/*.sol,script/**/*.sh,*.s.sol
+description: 部署脚本和运维自动化最佳实践
+---
+
+# 部署脚本规范
+
+## 脚本文件结构
+基于项目的 [script](mdc:script) 目录结构：
+
+```
+script/
+├── bsc_mainnet/          # BSC 主网部署脚本
+│   ├── reward-proxy.sh
+│   ├── shield-layer-silo.sh
+│   └── shield-layer.sh
+├── eth/                  # 以太坊主网部署脚本
+│   ├── reward-proxy.sh
+│   ├── shield-layer-silo.sh
+│   └── shield-layer.sh
+├── BSC.s.sol            # BSC 部署合约
+├── Mainnet.s.sol        # 主网部署合约
+└── role.txt             # 角色配置文档
+```
+
+## Foundry 脚本规范
+
+### 脚本合约命名
+- 使用描述性名称：`BSC.s.sol`, `Mainnet.s.sol`
+- 继承 `forge-std/Script.sol`
+- 合约名格式：`{Network}Script` 或 `Deploy{Contract}Script`
+
+### 脚本结构模板
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.28;
+
+import "forge-std/Script.sol";
+import "../contracts/ShieldLayer.sol";
+import "../contracts/USLT.sol";
+import "../contracts/stUSLTv2.sol";
+
+contract MainnetScript is Script {
+    // 配置常量
+    uint256 public constant MAX_MINT_PER_BLOCK = 2000000000000000000000000; // 2M USLT
+    uint256 public constant MAX_BURN_PER_BLOCK = 2000000000000000000000000; // 2M USLT
+    uint256 public constant COOLDOWN_DURATION = 7 days;
+    
+    // 部署的合约地址（用于验证）
+    address public usltAddress;
+    address public stusltAddress;
+    address public shieldLayerAddress;
+    
+    function run() external {
+        // 获取部署私钥
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        address deployer = vm.addr(deployerPrivateKey);
+        
+        console.log("Deployer:", deployer);
+        console.log("Deployer balance:", deployer.balance);
+        
+        vm.startBroadcast(deployerPrivateKey);
+        
+        // 部署合约
+        _deployContracts();
+        
+        // 配置合约
+        _configureContracts();
+        
+        // 验证部署
+        _verifyDeployment();
+        
+        vm.stopBroadcast();
+        
+        // 输出部署信息
+        _logDeploymentInfo();
+    }
+    
+    function _deployContracts() internal {
+        // 实现部署逻辑
+    }
+    
+    function _configureContracts() internal {
+        // 实现配置逻辑
+    }
+    
+    function _verifyDeployment() internal {
+        // 实现验证逻辑
+    }
+    
+    function _logDeploymentInfo() internal {
+        // 输出部署信息
+    }
+}
+```
+
+## Shell 脚本规范
+
+### 脚本模板
+基于项目现有的脚本结构：
+```bash
+#!/bin/bash
+
+# 脚本配置
+set -e  # 遇到错误立即退出
+set -u  # 使用未定义变量时报错
+
+# 颜色输出
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# 日志函数
+log_info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# 检查环境变量
+check_env() {
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        log_error "PRIVATE_KEY environment variable is not set"
+        exit 1
+    fi
+    
+    if [ -z "${RPC_URL:-}" ]; then
+        log_error "RPC_URL environment variable is not set"
+        exit 1
+    fi
+}
+
+# 部署函数
+deploy_contract() {
+    local contract_name=$1
+    local script_path=$2
+    
+    log_info "Deploying $contract_name..."
+    
+    forge script $script_path \
+        --rpc-url $RPC_URL \
+        --private-key $PRIVATE_KEY \
+        --broadcast \
+        --verify \
+        --delay 30 \
+        -vvvv
+    
+    if [ $? -eq 0 ]; then
+        log_info "$contract_name deployed successfully"
+    else
+        log_error "Failed to deploy $contract_name"
+        exit 1
+    fi
+}
+
+# 主函数
+main() {
+    log_info "Starting deployment process..."
+    
+    check_env
+    
+    # 部署合约
+    deploy_contract "ShieldLayer" "script/Mainnet.s.sol:MainnetScript"
+    
+    log_info "Deployment completed successfully!"
+}
+
+# 执行主函数
+main "$@"
+```
+
+### 环境变量管理
+```bash
+# .env 文件示例（不提交到仓库）
+PRIVATE_KEY=0x...
+RPC_URL=https://mainnet.infura.io/v3/...
+ETHERSCAN_API_KEY=...
+
+# 在脚本中加载环境变量
+if [ -f .env ]; then
+    export $(cat .env | grep -v '#' | xargs)
+fi
+```
+
+## 部署配置管理
+
+### 网络配置
+```solidity
+// 在部署脚本中定义网络特定配置
+struct NetworkConfig {
+    uint256 maxMintPerBlock;
+    uint256 maxBurnPerBlock;
+    uint256 cooldownDuration;
+    address custodianAddress;
+    // 支持的资产配置
+    address[] supportedAssets;
+    uint256[] assetRatios;
+}
+
+function getNetworkConfig() internal view returns (NetworkConfig memory) {
+    if (block.chainid == 1) {
+        // 以太坊主网配置
+        return NetworkConfig({
+            maxMintPerBlock: 2000000e18,
+            maxBurnPerBlock: 2000000e18,
+            cooldownDuration: 7 days,
+            custodianAddress: 0x..., // 设置实际地址
+            supportedAssets: new address[](1),
+            assetRatios: new uint256[](1)
+        });
+    } else if (block.chainid == 56) {
+        // BSC 主网配置
+        return NetworkConfig({
+            // BSC 特定配置
+        });
+    } else {
+        revert("Unsupported network");
+    }
+}
+```
+
+### 部署验证
+```solidity
+function _verifyDeployment() internal {
+    // 验证合约部署
+    require(address(uslt).code.length > 0, "USLT not deployed");
+    require(address(stuslt).code.length > 0, "stUSLT not deployed");
+    require(address(shieldLayer).code.length > 0, "ShieldLayer not deployed");
+    
+    // 验证配置
+    require(shieldLayer.uslt() == uslt, "USLT address mismatch");
+    require(shieldLayer.stuslt() == stuslt, "stUSLT address mismatch");
+    
+    // 验证权限
+    require(uslt.hasRole(CONTROLLER_ROLE, address(shieldLayer)), "ShieldLayer missing CONTROLLER_ROLE");
+    
+    console.log("✅ All deployments verified");
+}
+```
+
+## 多签和时间锁部署
+
+### 多签钱包配置
+```solidity
+// 如果使用多签钱包作为管理员
+address public constant MULTISIG_WALLET = 0x...;
+
+function _transferOwnership() internal {
+    // 将所有权转移到多签钱包
+    shieldLayer.grantRole(DEFAULT_ADMIN_ROLE, MULTISIG_WALLET);
+    shieldLayer.renounceRole(DEFAULT_ADMIN_ROLE, msg.sender);
+}
+```
+
+### 时间锁配置
+```solidity
+import "@openzeppelin/contracts/governance/TimelockController.sol";
+
+// 部署时间锁控制器
+TimelockController timelock = new TimelockController(
+    1 days,           // 最小延迟时间
+    proposers,        // 提案者地址数组
+    executors,        // 执行者地址数组
+    address(0)        // 可选的管理员地址
+);
+```
+
+## 升级机制
+
+### 代理模式部署
+```solidity
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+
+function deployUpgradeableContract() internal {
+    // 部署实现合约
+    ShieldLayer implementation = new ShieldLayer();
+    
+    // 部署代理管理员
+    ProxyAdmin proxyAdmin = new ProxyAdmin();
+    
+    // 部署透明代理
+    TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+        address(implementation),
+        address(proxyAdmin),
+        abi.encodeWithSelector(
+            ShieldLayer.initialize.selector,
+            // 初始化参数
+        )
+    );
+    
+    shieldLayer = ShieldLayer(address(proxy));
+}
+```
+
+## 部署后任务
+
+### 验证清单
+```bash
+#!/bin/bash
+# verify-deployment.sh
+
+echo "🔍 Verifying deployment..."
+
+# 1. 验证合约地址
+echo "📋 Contract addresses:"
+echo "USLT: $USLT_ADDRESS"
+echo "stUSLT: $STUSLT_ADDRESS"
+echo "ShieldLayer: $SHIELD_LAYER_ADDRESS"
+
+# 2. 验证合约在区块链浏览器上已验证
+echo "🔗 Checking contract verification..."
+
+# 3. 验证权限设置
+echo "🔐 Checking permissions..."
+
+# 4. 验证初始配置
+echo "⚙️  Checking initial configuration..."
+
+# 5. 执行基本功能测试
+echo "🧪 Running basic functionality tests..."
+
+echo "✅ Deployment verification completed"
+```
+
+### 监控和告警
+```bash
+# 部署后设置监控
+echo "📊 Setting up monitoring..."
+
+# 添加合约地址到监控系统
+# 配置告警规则
+# 设置资金流监控
+```
+
+## 安全最佳实践
+
+### 部署前检查
+- [ ] 代码审计完成
+- [ ] 测试覆盖率 > 95%
+- [ ] 所有依赖项已审计
+- [ ] 部署参数已验证
+- [ ] 紧急响应计划就绪
+
+### 部署过程安全
+- 使用硬件钱包或安全的密钥管理
+- 多人验证部署参数
+- 在测试网先行部署验证
+- 逐步部署，先部署核心合约
+- 部署后立即验证源代码
+
+### 部署后安全
+- 转移管理权限到多签钱包
+- 设置时间锁机制
+- 配置监控和告警
+- 准备紧急暂停机制
+- 建立升级流程

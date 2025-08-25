@@ -1,0 +1,157 @@
+---
+globs: *.sol
+description: Solidity编码规范和最佳实践
+---
+
+# Solidity 编码规范
+
+## 版本和许可证
+- 使用 SPDX 许可证标识符：`// SPDX-License-Identifier: MIT`
+- 固定 Solidity 版本：`pragma solidity 0.8.28;`
+- 避免使用浮动版本号（如 `^0.8.0`）
+
+## 代码结构顺序
+按以下顺序组织合约代码：
+1. 许可证声明
+2. pragma 声明
+3. import 语句
+4. 接口、库、合约声明
+5. 合约内部按以下顺序：
+   - 使用语句 (using)
+   - 常量 (constants)
+   - 状态变量 (state variables)
+   - 修饰器 (modifiers)
+   - 构造函数 (constructor)
+   - 外部函数 (external functions)
+   - 公共函数 (public functions)
+   - 内部函数 (internal functions)
+   - 私有函数 (private functions)
+
+## 命名规范
+- **合约名**: PascalCase (如 `ShieldLayer`, `RewardProxy`)
+- **函数名**: camelCase (如 `mintAndStake`, `cooldownShares`)
+- **变量名**: camelCase (如 `custodianAddress`, `maxMintPerBlock`)
+- **常量**: SCREAMING_SNAKE_CASE (如 `NATIVE_TOKEN`, `EIP712_DOMAIN`)
+- **私有/内部状态变量**: 使用下划线前缀 (如 `_supportedAssets`)
+- **修饰器**: camelCase (如 `ensureCustodian`, `belowMaxBurnPerBlock`)
+
+## 访问修饰符顺序
+函数声明时按以下顺序使用修饰符：
+1. 可见性 (public, external, internal, private)
+2. 状态可变性 (pure, view, payable)
+3. 自定义修饰器 (nonReentrant, onlyRole等)
+
+```solidity
+function mint(address asset, uint256 amount) external nonReentrant {
+    // 函数实现
+}
+```
+
+## 安全最佳实践
+
+### 重入防护
+对于状态改变的外部函数，使用 `nonReentrant` 修饰器：
+```solidity
+function mint(address asset, uint256 amount) external nonReentrant {
+    _mint(asset, amount);
+}
+```
+
+### 访问控制
+使用 OpenZeppelin 的 AccessControl 进行权限管理：
+```solidity
+function setMaxMintPerBlock(uint256 _maxMintPerBlock) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    _setMaxMintPerBlock(_maxMintPerBlock);
+}
+```
+
+### 输入验证
+在函数开始时进行参数验证：
+```solidity
+modifier ensureAssetSupported(address asset) {
+    if (_supportedAssets[asset] == 0 || asset == NATIVE_TOKEN) revert UnsupportedAsset();
+    _;
+}
+```
+
+### 错误处理
+使用自定义错误而不是 require 语句：
+```solidity
+// 定义错误
+error InvalidCustodianAddress();
+error UnsupportedAsset();
+error InsufficientAsset();
+
+// 使用错误
+if (custodianAddress == address(0)) revert InvalidCustodianAddress();
+```
+
+## 代码注释规范
+
+### NatSpec 文档
+为公共函数提供完整的 NatSpec 注释：
+```solidity
+/**
+ * @title ShieldLayer
+ * @notice This contract mints and redeems USLT in a single, atomic, trustless transaction
+ */
+
+/**
+ * @notice Mint stablecoins from assets
+ * @param asset The asset to mint USLT with
+ * @param amount The amount of asset to deposit
+ */
+function mint(address asset, uint256 amount) external nonReentrant {
+    _mint(asset, amount);
+}
+```
+
+### 内联注释
+为复杂逻辑提供解释性注释：
+```solidity
+// Add to the minted amount in this block
+mintedPerBlock[block.number] += amount;
+
+// Calculate USLT amount based on asset ratio
+uint256 usltAmount = previewMint(asset, amount);
+```
+
+### 区域分隔注释
+使用注释分隔不同的代码区域：
+```solidity
+/* --------------- CONSTANTS --------------- */
+
+/* --------------- STATE VARIABLES --------------- */
+
+/* --------------- MODIFIERS --------------- */
+```
+
+## Gas 优化建议
+- 使用 `uint256` 而不是较小的整数类型（除非打包存储）
+- 缓存存储变量到内存变量
+- 使用 `immutable` 标记在构造时设置的变量
+- 使用 `constant` 标记编译时常量
+
+## 事件规范
+- 事件名使用 PascalCase
+- 为重要的状态变更发出事件
+- 使用 `indexed` 关键字标记需要过滤的参数
+
+```solidity
+event Mint(address indexed user, address indexed asset, uint256 amount, uint256 usltAmount);
+event AssetAdded(address indexed asset);
+```
+
+## 导入规范
+- 使用具体的导入路径
+- 按字母顺序排列导入
+- 优先使用 OpenZeppelin 合约
+
+```solidity
+import "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+import "./interfaces/IShieldLayer.sol";
+import "./SingleAdminAccessControl.sol";
+```

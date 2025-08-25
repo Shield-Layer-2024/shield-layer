@@ -1,0 +1,68 @@
+---
+alwaysApply: true
+description: Shield Layer项目结构和架构指导
+---
+
+# Shield Layer 项目结构指导
+
+## 项目概述
+Shield Layer 是一个基于 Foundry 的去中心化金融(DeFi)协议，提供稳定币铸造、质押和赎回功能。
+
+## 核心合约架构
+
+### 主要合约
+- **[ShieldLayer.sol](mdc:contracts/ShieldLayer.sol)** - 主合约，提供铸造、赎回、质押功能
+- **[USLT.sol](mdc:contracts/USLT.sol)** - 项目的稳定币代币合约
+- **[stUSLTv2.sol](mdc:contracts/stUSLTv2.sol)** - 质押代币合约，基于 ERC-4626 标准
+- **[ShieldLayerSilo.sol](mdc:contracts/ShieldLayerSilo.sol)** - Silo 合约，用于冷却期间存储 USLT
+- **[RewardProxy.sol](mdc:contracts/RewardProxy.sol)** - 奖励代理合约，简化奖励转账流程
+
+### 接口定义
+- **[IShieldLayer.sol](mdc:contracts/interfaces/IShieldLayer.sol)** - 主合约接口
+- **[IShieldLayerEvents.sol](mdc:contracts/interfaces/IShieldLayerEvents.sol)** - 事件定义接口
+
+### 工具合约
+- **[SingleAdminAccessControl.sol](mdc:contracts/SingleAdminAccessControl.sol)** - 访问控制合约
+- **[MockUSDT.sol](mdc:contracts/mock/MockUSDT.sol)** - 测试用的 USDT 模拟合约
+
+## 目录结构
+```
+contracts/
+├── interfaces/          # 接口定义
+├── mock/               # 测试模拟合约
+├── ShieldLayer.sol     # 主合约
+├── USLT.sol           # 稳定币合约
+├── stUSLTv2.sol       # 质押代币合约
+├── ShieldLayerSilo.sol # Silo 存储合约
+├── RewardProxy.sol    # 奖励代理合约
+└── SingleAdminAccessControl.sol # 访问控制
+
+test/                   # 测试文件
+script/                 # 部署脚本
+lib/                    # 依赖库
+```
+
+## 核心业务流程
+
+### 铸造和质押流程
+1. 用户调用 `mintAndStake()` 函数
+2. 将抵押资产转移到托管地址
+3. 计算用户将收到的 USLT 数量
+4. 将 USLT 存入质押合约获得 stUSLT
+
+### 解除质押流程
+两步过程：
+1. **冷却期**: 调用 `cooldownShares()` 计算 USLT 数量并开始冷却
+2. **解除质押**: 冷却期结束后调用 `unstake()` 提取 USLT
+
+### 赎回流程
+1. 计算用户将收到的资产数量
+2. 从用户地址销毁 USLT
+3. 从 ShieldLayer 合约转移资产到用户地址
+
+## 开发约定
+- 使用 Foundry 框架进行开发和测试
+- 遵循 OpenZeppelin 安全标准
+- 采用 ERC-4626 标准实现质押功能
+- 使用 EIP-712 进行签名验证
+- 实现访问控制和重入防护机制

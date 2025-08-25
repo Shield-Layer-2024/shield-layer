@@ -1,0 +1,226 @@
+---
+alwaysApply: false
+---
+# 智能合约安全审计规则
+
+## 常见漏洞检查清单
+
+### 重入攻击防护 ✅
+项目已正确实现：
+```solidity
+// 使用 ReentrancyGuard 保护状态变更函数
+function mint(address asset, uint256 amount) external nonReentrant {
+    _mint(asset, amount);
+}
+
+function redeem(address asset, uint256 amount) external nonReentrant {
+    // 实现
+}
+```
+
+### 访问控制 ✅
+项目已正确实现：
+```solidity
+// 使用 OpenZeppelin AccessControl
+function setMaxMintPerBlock(uint256 _maxMintPerBlock) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    _setMaxMintPerBlock(_maxMintPerBlock);
+}
+```
+
+### 整数溢出/下溢保护 ✅
+- 使用 Solidity 0.8.28，内置溢出保护
+- 关键计算使用安全数学运算
+
+### 外部调用安全
+**需要关注的点：**
+```solidity
+// 使用 SafeERC20 进行代币转账
+using SafeERC20 for IERC20;
+
+// 确保外部调用后的状态一致性
+IERC20(asset).safeTransfer(beneficiary, amount);
+```
+
+## 业务逻辑安全检查
+
+### 1. 铸造限制机制 ✅
+```solidity
+// 每个区块的铸造限制
+mapping(uint256 => uint256) public mintedPerBlock;
+uint256 public maxMintPerBlock;
+
+// 检查是否超过限制（注意：代码中缺少此检查）
+// 建议添加：
+modifier belowMaxMintPerBlock(uint256 mintAmount) {
+    if (mintedPerBlock[block.number] + mintAmount > maxMintPerBlock) {
+        revert MaxMintPerBlockExceeded();
+    }
+    _;
+}
+```
+
+### 2. 赎回限制机制 ✅
+```solidity
+// 每个区块的赎回限制
+modifier belowMaxBurnPerBlock(uint256 redeemAmount) {
+    if (burnedPerBlock[block.number] + redeemAmount > maxBurnPerBlock) {
+        revert MaxBurnPerBlockExceeded();
+    }
+    _;
+}
+```
+
+### 3. 资产支持验证 ✅
+```solidity
+modifier ensureAssetSupported(address asset) {
+    if (_supportedAssets[asset] == 0 || asset == NATIVE_TOKEN) {
+        revert UnsupportedAsset();
+    }
+    _;
+}
+```
+
+### 4. 托管地址验证 ✅
+```solidity
+modifier ensureCustodian() {
+    if (custodianAddress == address(0)) revert InvalidCustodianAddress();
+    _;
+}
+```
+
+## 安全最佳实践
+
+### 输入验证
+```solidity
+// 地址零检查
+if (asset == address(0)) revert InvalidAssetAddress();
+
+// 数值范围检查  
+if (ratio == 0) revert InvalidAssetRatio();
+
+// 防止自引用
+if (asset == address(uslt)) revert InvalidAssetAddress();
+```
+
+### 状态一致性
+```solidity
+// 确保操作的原子性
+function mintAndStake(address asset, uint256 amount) external {
+    uint256 usltAmount = _mint(asset, amount);
+    uslt.approve(address(stuslt), usltAmount);
+    stuslt.deposit(usltAmount, msg.sender);
+}
+```
+
+### 错误处理
+```solidity
+// 使用自定义错误而不是字符串
+error InvalidCustodianAddress();
+error UnsupportedAsset();
+error InsufficientAsset();
+error MaxBurnPerBlockExceeded();
+```
+
+## 潜在风险点分析
+
+### ⚠️ 需要关注的安全问题
+
+#### 1. 铸造函数缺少限制检查
+**问题位置**: [ShieldLayer.sol:228-239](mdc:contracts/ShieldLayer.sol)
+```solidity
+function _mint(address asset, uint256 amount) internal returns (uint256) {
+    // 添加到区块铸造量
+    mintedPerBlock[block.number] += amount;
+    
+    // ❌ 缺少对 maxMintPerBlock 的检查
+    // 建议添加：
+    // if (mintedPerBlock[block.number] > maxMintPerBlock) {
+    //     revert MaxMintPerBlockExceeded();
+    // }
+}
+```
+
+#### 2. 资产余额检查
+**问题位置**: [ShieldLayer.sol:131](mdc:contracts/ShieldLayer.sol)
+```solidity
+// ✅ 已正确实现
+if (IERC20(asset).balanceOf(address(this)) < assetAmount) revert InsufficientAsset();
+```
+
+#### 3. 价格操纵风险
+- 资产比率设置需要管理员权限 ✅
+- 建议添加价格预言机验证机制
+- 建议添加比率变更的时间锁机制
+
+#### 4. Flash Loan 攻击防护
+- 当前使用区块级别限制 ✅
+- 建议考虑添加用户级别的限制
+
+### 🔒 推荐的安全增强
+
+#### 1. 时间锁机制
+```solidity
+// 对重要参数变更添加时间锁
+uint256 public constant TIMELOCK_DELAY = 24 hours;
+mapping(bytes32 => uint256) public pendingChanges;
+```
+
+#### 2. 多重签名
+```solidity
+// 对高权限操作要求多重签名
+modifier requireMultiSig() {
+    // 实现多重签名验证
+    _;
+}
+```
+
+#### 3. 紧急暂停机制
+```solidity
+// 添加紧急暂停功能
+bool public emergencyPaused;
+
+modifier whenNotPaused() {
+    require(!emergencyPaused, "Contract is paused");
+    _;
+}
+```
+
+## 测试覆盖要求
+
+### 必须测试的场景
+1. **边界条件测试**
+   - 最大/最小金额
+   - 零值输入
+   - 溢出条件
+
+2. **权限测试**
+   - 未授权访问
+   - 角色权限验证
+   - 权限撤销场景
+
+3. **攻击向量测试**
+   - 重入攻击尝试
+   - Flash loan 攻击
+   - 前端运行攻击
+
+4. **异常情况测试**
+   - 网络拥堵时的行为
+   - 极端市场条件
+   - 合约升级场景
+
+## 审计检查清单
+
+### 代码审查要点
+- [ ] 所有外部调用都有适当的检查
+- [ ] 状态变更遵循 CEI 模式
+- [ ] 数学运算安全性验证
+- [ ] 访问控制完整性
+- [ ] 事件发出的完整性
+- [ ] Gas 优化合理性
+
+### 部署前检查
+- [ ] 所有测试通过
+- [ ] 代码覆盖率达标
+- [ ] 静态分析工具检查
+- [ ] 第三方安全审计
+- [ ] 主网部署参数验证
